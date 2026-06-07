@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Application, ApplicationStatus } from "@/app/lib/db";
+import type { TwitterProfile } from "@/app/lib/xapi";
 
 const STATUS_LABEL: Record<ApplicationStatus, string> = {
   pending: "待审核",
@@ -161,6 +162,32 @@ function ApplicationCard({
   onUpdate: (id: number, status: ApplicationStatus) => void;
 }) {
   const handle = app.twitter.replace(/^@/, "");
+  const [profile, setProfile] = useState<TwitterProfile | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+
+  async function fetchProfile() {
+    setFetching(true);
+    setFetchError("");
+    try {
+      const res = await fetch("/api/admin/twitter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFetchError(data.error ?? "抓取失败");
+        return;
+      }
+      setProfile(data.profile);
+    } catch {
+      setFetchError("网络错误");
+    } finally {
+      setFetching(false);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-divider bg-background p-5 shadow-[0_2px_12px_var(--card-shadow)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -180,8 +207,24 @@ function ApplicationCard({
           >
             {STATUS_LABEL[app.status]}
           </span>
+          <a
+            href={`https://x.com/${handle}`}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-2 inline-block rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-600 hover:bg-sky-100"
+            title="去 Twitter 主页确认蓝V"
+          >
+            去主页核验蓝V ↗
+          </a>
         </div>
         <div className="flex gap-2">
+          <button
+            disabled={fetching}
+            onClick={fetchProfile}
+            className="rounded-md border border-divider px-3 py-1.5 text-sm font-medium hover:bg-alternate disabled:opacity-40"
+          >
+            {fetching ? "抓取中…" : profile ? "重新抓取" : "抓资料"}
+          </button>
           <button
             disabled={busy || app.status === "approved"}
             onClick={() => onUpdate(app.id, "approved")}
@@ -226,6 +269,44 @@ function ApplicationCard({
           {app.intro}
         </div>
       )}
+
+      {fetchError && (
+        <p className="mt-3 rounded-md bg-red-50 px-4 py-2 text-sm text-red-600">
+          {fetchError}
+        </p>
+      )}
+
+      {profile && (
+        <div className="mt-3 rounded-md border border-sky-100 bg-sky-50/50 px-4 py-3">
+          <div className="flex items-center gap-3">
+            {profile.avatar && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.avatar}
+                alt={profile.name}
+                className="h-9 w-9 rounded-full"
+              />
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{profile.name}</p>
+              <p className="text-xs text-muted">
+                注册于 {formatJoinDate(profile.created_at)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            <Stat label="粉丝" value={fmtNum(profile.followers)} />
+            <Stat label="关注" value={fmtNum(profile.following)} />
+            <Stat label="推文" value={fmtNum(profile.tweets)} />
+            <Stat label="点赞" value={fmtNum(profile.likes)} />
+          </div>
+          {profile.description && (
+            <p className="mt-2 text-sm leading-relaxed text-foreground">
+              {profile.description}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -256,4 +337,29 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+function formatJoinDate(raw: string): string {
+  if (!raw) return "—";
+  try {
+    return new Date(raw).toLocaleDateString("zh-CN");
+  } catch {
+    return raw;
+  }
+}
+
+function fmtNum(n: number | null): string {
+  if (n == null) return "—";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <span className="text-muted">{label} </span>
+      <span className="font-semibold">{value}</span>
+    </span>
+  );
 }
