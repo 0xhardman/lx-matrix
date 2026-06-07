@@ -3,7 +3,7 @@ import Link from "next/link";
 
 const navItems = [
   { href: "/rules", label: "群规则" },
-  { href: "/register", label: "账号登记" },
+  { href: "/register", label: "申请加入" },
 ];
 
 export function SiteHeader() {
@@ -37,7 +37,7 @@ export function SiteHeader() {
             href="/register"
             className="ml-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-85"
           >
-            登记我的推特
+            申请加入
           </Link>
         </nav>
       </div>

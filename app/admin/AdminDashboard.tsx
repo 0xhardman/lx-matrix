@@ -1,0 +1,259 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { Application, ApplicationStatus } from "@/app/lib/db";
+
+const STATUS_LABEL: Record<ApplicationStatus, string> = {
+  pending: "待审核",
+  approved: "已通过",
+  rejected: "已拒绝",
+};
+
+const STATUS_STYLE: Record<ApplicationStatus, string> = {
+  pending: "bg-secondary/20 text-secondary-dark",
+  approved: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-600",
+};
+
+const FILTERS: { key: "all" | ApplicationStatus; label: string }[] = [
+  { key: "pending", label: "待审核" },
+  { key: "approved", label: "已通过" },
+  { key: "rejected", label: "已拒绝" },
+  { key: "all", label: "全部" },
+];
+
+export function AdminDashboard() {
+  const [apps, setApps] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<"all" | ApplicationStatus>("pending");
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/applications");
+      if (!res.ok) {
+        setError("读取失败，可能登录已过期");
+        return;
+      }
+      const data = await res.json();
+      setApps(data.applications ?? []);
+    } catch {
+      setError("网络错误");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function updateStatus(id: number, status: ApplicationStatus) {
+    setBusyId(id);
+    try {
+      const res = await fetch("/api/admin/applications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      if (res.ok) {
+        setApps((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status } : a))
+        );
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/admin/logout", { method: "POST" });
+    window.location.reload();
+  }
+
+  const counts = {
+    pending: apps.filter((a) => a.status === "pending").length,
+    approved: apps.filter((a) => a.status === "approved").length,
+    rejected: apps.filter((a) => a.status === "rejected").length,
+  };
+
+  const visible =
+    filter === "all" ? apps : apps.filter((a) => a.status === filter);
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">入群申请</h1>
+          <p className="mt-1 text-sm text-muted">
+            待审核 {counts.pending} · 已通过 {counts.approved} · 已拒绝{" "}
+            {counts.rejected}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={load}
+            className="rounded-md border border-divider px-3 py-2 text-sm font-medium hover:bg-alternate"
+          >
+            刷新
+          </button>
+          <button
+            onClick={logout}
+            className="rounded-md border border-divider px-3 py-2 text-sm font-medium hover:bg-alternate"
+          >
+            退出
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-2">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+              filter === f.key
+                ? "border-primary bg-primary text-white"
+                : "border-divider bg-background text-muted hover:bg-alternate"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <p className="mt-6 rounded-md bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      {loading ? (
+        <p className="mt-10 text-center text-muted">加载中…</p>
+      ) : visible.length === 0 ? (
+        <p className="mt-10 text-center text-muted">没有符合条件的申请。</p>
+      ) : (
+        <div className="mt-6 space-y-4">
+          {visible.map((a) => (
+            <ApplicationCard
+              key={a.id}
+              app={a}
+              busy={busyId === a.id}
+              onUpdate={updateStatus}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ApplicationCard({
+  app,
+  busy,
+  onUpdate,
+}: {
+  app: Application;
+  busy: boolean;
+  onUpdate: (id: number, status: ApplicationStatus) => void;
+}) {
+  const handle = app.twitter.replace(/^@/, "");
+  return (
+    <div className="rounded-xl border border-divider bg-background p-5 shadow-[0_2px_12px_var(--card-shadow)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <a
+            href={`https://x.com/${handle}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-lg font-bold underline-offset-4 hover:underline"
+          >
+            {app.twitter}
+          </a>
+          <span
+            className={`ml-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              STATUS_STYLE[app.status]
+            }`}
+          >
+            {STATUS_LABEL[app.status]}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            disabled={busy || app.status === "approved"}
+            onClick={() => onUpdate(app.id, "approved")}
+            className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-85 disabled:opacity-40"
+          >
+            通过
+          </button>
+          <button
+            disabled={busy || app.status === "rejected"}
+            onClick={() => onUpdate(app.id, "rejected")}
+            className="rounded-md bg-red-500 px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-85 disabled:opacity-40"
+          >
+            拒绝
+          </button>
+          {app.status !== "pending" && (
+            <button
+              disabled={busy}
+              onClick={() => onUpdate(app.id, "pending")}
+              className="rounded-md border border-divider px-3 py-1.5 text-sm font-medium hover:bg-alternate disabled:opacity-40"
+            >
+              重置
+            </button>
+          )}
+        </div>
+      </div>
+
+      <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <Field label="微信">{app.wechat}</Field>
+        <Field label="蓝V">{boolText(app.has_blue_v)}</Field>
+        <Field label="LXDAO 成员">{boolText(app.is_lxdao_member)}</Field>
+        <Field label="LXDAO 佐证">{app.lxdao_proof || "—"}</Field>
+        <Field label="内容方向">
+          {app.directions?.length ? app.directions.join(" / ") : "—"}
+        </Field>
+        <Field label="更新频率">{app.frequency || "—"}</Field>
+        <Field label="推荐人">{app.referrer || "—"}</Field>
+        <Field label="提交时间">{formatDate(app.created_at)}</Field>
+      </dl>
+
+      {app.intro && (
+        <div className="mt-3 rounded-md bg-alternate px-4 py-3 text-sm leading-relaxed text-foreground">
+          {app.intro}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-2">
+      <dt className="shrink-0 text-muted">{label}：</dt>
+      <dd className="font-medium">{children}</dd>
+    </div>
+  );
+}
+
+function boolText(v: boolean | null): string {
+  if (v === null) return "—";
+  return v ? "是" : "否";
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("zh-CN", { hour12: false });
+  } catch {
+    return iso;
+  }
+}

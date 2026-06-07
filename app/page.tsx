@@ -37,7 +37,7 @@ export default function Home() {
               href="/register"
               className="w-full rounded-md bg-primary px-7 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85 sm:w-auto"
             >
-              登记我的推特
+              申请加入
             </Link>
             <Link
               href="/rules"
@@ -72,14 +72,14 @@ export default function Home() {
               准备好加入了吗？
             </h2>
             <p className="mt-2 text-white/70">
-              进群第一件事：登记你的推特链接和微信名称。
+              填写申请信息，通过 review 后我们会与你联系。
             </p>
           </div>
           <Link
             href="/register"
             className="shrink-0 rounded-md bg-secondary px-7 py-3 text-base font-semibold text-black transition-opacity hover:opacity-85"
           >
-            去登记 →
+            去申请 →
           </Link>
         </div>
       </section>

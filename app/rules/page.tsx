@@ -43,7 +43,7 @@ const sections: Section[] = [
   {
     id: "first",
     title: "进群第一件事",
-    body: "发一下你的推特链接进行登记。",
+    body: "通过官网填写申请信息，发一下你的推特链接进行登记。",
   },
   {
     id: "howto",
@@ -92,13 +92,13 @@ export default function RulesPage() {
             欢迎加入 LX 矩阵蓝V互推
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted">
-            这是基本的群规则。进群第一件事，记得先登记你的推特。
+            这是基本的群规则。进群第一件事，记得先提交入群申请。
           </p>
           <Link
             href="/register"
             className="mt-8 inline-block rounded-md bg-primary px-7 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85"
           >
-            去登记我的推特 →
+            去提交入群申请 →
           </Link>
         </div>
       </section>

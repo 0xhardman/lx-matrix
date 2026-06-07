@@ -21,7 +21,7 @@ export function SiteFooter() {
             群规则
           </Link>
           <Link href="/register" className="hover:text-foreground">
-            账号登记
+            申请加入
           </Link>
         </nav>
       </div>

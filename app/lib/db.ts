@@ -48,7 +48,33 @@ export function getPool(): Pool {
 let initialized = false;
 
 /**
- * Ensure the registrations table exists. Runs once per process.
+ * Application review status.
+ */
+export type ApplicationStatus = "pending" | "approved" | "rejected";
+
+/**
+ * A membership application row as returned to the admin dashboard.
+ */
+export interface Application {
+  id: number;
+  twitter: string;
+  wechat: string;
+  has_blue_v: boolean | null;
+  is_lxdao_member: boolean | null;
+  lxdao_proof: string | null;
+  directions: string[] | null;
+  frequency: string | null;
+  intro: string | null;
+  referrer: string | null;
+  status: ApplicationStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Ensure the applications table exists and has every column. Idempotent — new
+ * columns are added in place so existing rows are preserved. Runs once per
+ * process.
  */
 export async function ensureSchema() {
   if (initialized) return;
@@ -62,6 +88,17 @@ export async function ensureSchema() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS twitter_registrations_twitter_key
       ON twitter_registrations (lower(twitter));
+
+    -- Application fields (added incrementally; preserves existing rows).
+    ALTER TABLE twitter_registrations
+      ADD COLUMN IF NOT EXISTS has_blue_v       BOOLEAN,
+      ADD COLUMN IF NOT EXISTS is_lxdao_member  BOOLEAN,
+      ADD COLUMN IF NOT EXISTS lxdao_proof      TEXT,
+      ADD COLUMN IF NOT EXISTS directions       TEXT[],
+      ADD COLUMN IF NOT EXISTS frequency        TEXT,
+      ADD COLUMN IF NOT EXISTS intro            TEXT,
+      ADD COLUMN IF NOT EXISTS referrer         TEXT,
+      ADD COLUMN IF NOT EXISTS status           TEXT NOT NULL DEFAULT 'pending';
   `);
   initialized = true;
 }
