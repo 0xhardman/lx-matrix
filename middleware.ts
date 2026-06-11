@@ -15,11 +15,14 @@ export async function middleware(req: NextRequest) {
 
   const hasGatePass = await verifyGatePass(req.cookies.get(GATE_COOKIE)?.value);
   const hasMember = Boolean(req.cookies.get(MEMBER_COOKIE)?.value);
-  const hasSession = Boolean(
-    await readSession(req.cookies.get(SESSION_COOKIE)?.value)
-  );
+  // Only an *approved member* session passes the gate — a logged-in non-member
+  // must still use an invite code. isMember is signed into the token server-side.
+  const session = await readSession(req.cookies.get(SESSION_COOKIE)?.value);
+  const isMemberSession = Boolean(session?.isMember);
 
-  if (hasGatePass || hasMember || hasSession) return NextResponse.next();
+  if (hasGatePass || hasMember || isMemberSession) {
+    return NextResponse.next();
+  }
 
   // Not unlocked — send to the gate, remembering where they wanted to go.
   const url = req.nextUrl.clone();

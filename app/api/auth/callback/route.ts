@@ -123,13 +123,17 @@ export async function GET(request: Request) {
   // Set the login session, and clear the one-time OAuth cookies.
   const dest = isMember ? "/" : "/login?status=not_member";
   const res = NextResponse.redirect(new URL(dest, baseUrl(request)));
-  res.cookies.set(SESSION_COOKIE, await signSession({ twitter: handle, name, avatar }), {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  res.cookies.set(
+    SESSION_COOKIE,
+    await signSession({ twitter: handle, name, avatar, isMember }),
+    {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    }
+  );
   res.cookies.delete(OAUTH_STATE_COOKIE);
   res.cookies.delete(OAUTH_VERIFIER_COOKIE);
 

@@ -45,6 +45,9 @@ export interface SessionData {
   twitter: string; // @handle
   name?: string;
   avatar?: string;
+  // Membership status, set server-side from the DB at login. Signed into the
+  // token, so it cannot be forged client-side.
+  isMember?: boolean;
 }
 
 /** Create a signed session token: base64url(json).signature */
