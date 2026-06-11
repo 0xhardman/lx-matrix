@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 export function GateForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const from = params.get("from") || "/";
 
@@ -35,8 +34,10 @@ export function GateForm() {
         !from.startsWith("/\\")
           ? from
           : "/";
-      router.replace(safe);
-      router.refresh();
+      // Use a full-page navigation (not client-side router) so the freshly-set
+      // gate cookie is sent with the request — otherwise middleware on the
+      // target page may not see it yet and bounce us back to /gate.
+      window.location.assign(safe);
     } catch {
       setError("网络错误，请稍后再试");
     } finally {
