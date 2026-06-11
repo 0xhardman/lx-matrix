@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, verifyToken } from "@/app/lib/auth";
 import { ensureSchema, getPool, type ApplicationStatus } from "@/app/lib/db";
+import { generateMemberToken } from "@/app/lib/gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function GET() {
     const { rows } = await getPool().query(
       `SELECT id, twitter, wechat, has_blue_v, is_lxdao_member, lxdao_proof,
               directions, frequency, intro, referrer, status,
-              created_at, updated_at
+              member_token, invite_code_used, created_at, updated_at
        FROM twitter_registrations
        ORDER BY
          CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
@@ -55,14 +56,24 @@ export async function PATCH(request: Request) {
 
   try {
     await ensureSchema();
-    const { rowCount } = await getPool().query(
-      `UPDATE twitter_registrations SET status = $1, updated_at = now() WHERE id = $2`,
-      [status, id]
+    // On approval, issue a member_token once (if not already set) so the
+    // member can access the site and mint invite codes.
+    const { rows } = await getPool().query(
+      `UPDATE twitter_registrations
+       SET status = $1,
+           member_token = CASE
+             WHEN $1 = 'approved' AND member_token IS NULL THEN $3
+             ELSE member_token
+           END,
+           updated_at = now()
+       WHERE id = $2
+       RETURNING member_token`,
+      [status, id, generateMemberToken()]
     );
-    if (rowCount === 0) {
+    if (rows.length === 0) {
       return NextResponse.json({ error: "记录不存在" }, { status: 404 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, member_token: rows[0].member_token });
   } catch (err) {
     console.error("[admin] failed to update status:", err);
     return NextResponse.json({ error: "更新失败" }, { status: 500 });

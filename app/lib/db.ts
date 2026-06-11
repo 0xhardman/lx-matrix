@@ -67,8 +67,23 @@ export interface Application {
   intro: string | null;
   referrer: string | null;
   status: ApplicationStatus;
+  member_token: string | null;
+  invite_code_used: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * An invite code. Single-use, time-limited.
+ */
+export interface InviteCode {
+  code: string;
+  created_by: string | null; // member token or 'admin'
+  created_by_twitter: string | null;
+  expires_at: string;
+  used_at: string | null;
+  used_by_twitter: string | null;
+  created_at: string;
 }
 
 /**
@@ -98,7 +113,22 @@ export async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS frequency        TEXT,
       ADD COLUMN IF NOT EXISTS intro            TEXT,
       ADD COLUMN IF NOT EXISTS referrer         TEXT,
-      ADD COLUMN IF NOT EXISTS status           TEXT NOT NULL DEFAULT 'pending';
+      ADD COLUMN IF NOT EXISTS status           TEXT NOT NULL DEFAULT 'pending',
+      ADD COLUMN IF NOT EXISTS member_token     TEXT,
+      ADD COLUMN IF NOT EXISTS invite_code_used TEXT;
+
+    -- Invite codes: single-use, time-limited.
+    CREATE TABLE IF NOT EXISTS invite_codes (
+      code               TEXT PRIMARY KEY,
+      created_by         TEXT,
+      created_by_twitter TEXT,
+      expires_at         TIMESTAMPTZ NOT NULL,
+      used_at            TIMESTAMPTZ,
+      used_by_twitter    TEXT,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS invite_codes_created_by_idx
+      ON invite_codes (created_by);
   `);
   initialized = true;
 }

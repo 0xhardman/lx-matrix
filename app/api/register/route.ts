@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
+import { GATE_CODE_COOKIE, normalizeCode } from "@/app/lib/gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,15 +108,48 @@ export async function POST(request: Request) {
     );
   }
 
+  // Invite code: read from the gate cookie (set when the visitor unlocked).
+  const store = await cookies();
+  const inviteCode = normalizeCode(store.get(GATE_CODE_COOKIE)?.value ?? "");
+  if (!inviteCode) {
+    return NextResponse.json(
+      { error: "请先通过邀请码进入，再提交申请" },
+      { status: 403 }
+    );
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
   try {
     await ensureSchema();
-    // Upsert by twitter. Re-applying resets status to pending for re-review.
-    await getPool().query(
+    await client.query("BEGIN");
+
+    // Lock the code row and re-check validity inside the transaction.
+    const { rows } = await client.query(
+      `SELECT code, expires_at, used_at FROM invite_codes WHERE code = $1 FOR UPDATE`,
+      [inviteCode]
+    );
+    const codeRow = rows[0];
+    if (!codeRow) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "邀请码无效" }, { status: 403 });
+    }
+    if (codeRow.used_at) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "邀请码已被使用" }, { status: 410 });
+    }
+    if (new Date(codeRow.expires_at).getTime() < Date.now()) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "邀请码已过期" }, { status: 410 });
+    }
+
+    // Upsert the application. Re-applying resets status to pending.
+    await client.query(
       `
       INSERT INTO twitter_registrations
         (twitter, wechat, has_blue_v, is_lxdao_member, lxdao_proof,
-         directions, frequency, intro, referrer, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending')
+         directions, frequency, intro, referrer, status, invite_code_used)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10)
       ON CONFLICT (lower(twitter)) DO UPDATE SET
         wechat = EXCLUDED.wechat,
         has_blue_v = EXCLUDED.has_blue_v,
@@ -125,6 +160,7 @@ export async function POST(request: Request) {
         intro = EXCLUDED.intro,
         referrer = EXCLUDED.referrer,
         status = 'pending',
+        invite_code_used = EXCLUDED.invite_code_used,
         updated_at = now()
       `,
       [
@@ -137,11 +173,23 @@ export async function POST(request: Request) {
         frequency,
         intro,
         referrer,
+        inviteCode,
       ]
     );
+
+    // Burn the code.
+    await client.query(
+      `UPDATE invite_codes SET used_at = now(), used_by_twitter = $2 WHERE code = $1`,
+      [inviteCode, twitter]
+    );
+
+    await client.query("COMMIT");
     return NextResponse.json({ ok: true, twitter });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("[register] failed to save application:", err);
     return NextResponse.json({ error: "提交失败，请稍后再试" }, { status: 500 });
+  } finally {
+    client.release();
   }
 }

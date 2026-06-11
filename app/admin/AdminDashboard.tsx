@@ -110,6 +110,8 @@ export function AdminDashboard() {
         </div>
       </div>
 
+      <AdminInvitePanel />
+
       <div className="mt-6 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <button
@@ -146,6 +148,114 @@ export function AdminDashboard() {
               onUpdate={updateStatus}
             />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface InviteRow {
+  code: string;
+  created_by_twitter: string | null;
+  expires_at: string;
+  used_at: string | null;
+  used_by_twitter: string | null;
+}
+
+function AdminInvitePanel() {
+  const [open, setOpen] = useState(false);
+  const [codes, setCodes] = useState<InviteRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/invites");
+      if (res.ok) setCodes((await res.json()).codes ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open) load();
+  }, [open, load]);
+
+  async function generate() {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/admin/invites", { method: "POST" });
+      if (res.ok) await load();
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function codeStatus(c: InviteRow): { label: string; cls: string } {
+    if (c.used_at) return { label: "已使用", cls: "bg-gray-100 text-gray-500" };
+    if (new Date(c.expires_at).getTime() < Date.now())
+      return { label: "已过期", cls: "bg-red-100 text-red-600" };
+    return { label: "可用", cls: "bg-green-100 text-green-700" };
+  }
+
+  return (
+    <div className="mt-6 rounded-xl border border-divider bg-background p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">邀请码管理</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={generate}
+            disabled={generating}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-85 disabled:opacity-50"
+          >
+            {generating ? "生成中…" : "+ 生成邀请码"}
+          </button>
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-md border border-divider px-3 py-2 text-sm font-medium hover:bg-alternate"
+          >
+            {open ? "收起" : "查看全部"}
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div className="mt-4 space-y-2">
+          {loading ? (
+            <p className="py-4 text-center text-sm text-muted">加载中…</p>
+          ) : codes.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted">还没有邀请码。</p>
+          ) : (
+            codes.map((c) => {
+              const st = codeStatus(c);
+              return (
+                <div
+                  key={c.code}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-divider px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <code className="font-mono font-bold tracking-wider">
+                      {c.code}
+                    </code>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}
+                    >
+                      {st.label}
+                    </span>
+                    <CopyButton text={c.code} />
+                  </div>
+                  <span className="text-xs text-muted">
+                    {c.used_at
+                      ? `被 ${c.used_by_twitter ?? "他人"} 使用`
+                      : `至 ${new Date(c.expires_at).toLocaleString("zh-CN", { hour12: false })}`}
+                    {" · 来自 "}
+                    {c.created_by_twitter ?? "—"}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </div>
@@ -261,8 +371,23 @@ function ApplicationCard({
         </Field>
         <Field label="更新频率">{app.frequency || "—"}</Field>
         <Field label="推荐人">{app.referrer || "—"}</Field>
+        <Field label="所用邀请码">{app.invite_code_used || "—"}</Field>
         <Field label="提交时间">{formatDate(app.created_at)}</Field>
       </dl>
+
+      {app.status === "approved" && app.member_token && (
+        <div className="mt-3 rounded-md border border-green-100 bg-green-50/60 px-4 py-3">
+          <p className="text-xs font-semibold text-green-700">
+            成员凭证（发给 ta，用于进站和生成邀请码）
+          </p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <code className="flex-1 truncate rounded bg-white px-2 py-1 text-xs">
+              {app.member_token}
+            </code>
+            <CopyButton text={app.member_token} />
+          </div>
+        </div>
+      )}
 
       {app.intro && (
         <div className="mt-3 rounded-md bg-alternate px-4 py-3 text-sm leading-relaxed text-foreground">
@@ -353,6 +478,22 @@ function fmtNum(n: number | null): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
   return String(n);
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(text);
+        setDone(true);
+        setTimeout(() => setDone(false), 1500);
+      }}
+      className="shrink-0 rounded-md border border-divider px-2.5 py-1 text-xs font-medium hover:bg-alternate"
+    >
+      {done ? "已复制 ✓" : "复制"}
+    </button>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
