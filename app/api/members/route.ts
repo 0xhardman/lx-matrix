@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
+import { MEMBER_COOKIE } from "@/app/lib/gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,17 +23,18 @@ interface MemberRow {
 }
 
 /**
- * Read the member token from the `x-member-token` header or `?token=` query.
+ * Read the member token from the httpOnly `lx_member` cookie or the
+ * `x-member-token` header. Never from the URL (would leak into logs/history).
  */
-function readToken(request: Request): string {
+async function readToken(request: Request): Promise<string> {
   const header = request.headers.get("x-member-token");
   if (header) return header.trim();
-  const url = new URL(request.url);
-  return (url.searchParams.get("token") || "").trim();
+  const store = await cookies();
+  return store.get(MEMBER_COOKIE)?.value?.trim() || "";
 }
 
 export async function GET(request: Request) {
-  const token = readToken(request);
+  const token = await readToken(request);
   if (!token) {
     return NextResponse.json({ error: "缺少成员令牌" }, { status: 401 });
   }

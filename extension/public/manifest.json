@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "LX 矩阵 · 成员监控",
+  "version": "0.1.0",
+  "description": "查看 LX 矩阵已通过审核的成员，以及他们今天有没有发帖。",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "LX 矩阵成员监控"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["http://localhost/*", "https://*/*"]
+}
