@@ -27,8 +27,15 @@ export function GateForm() {
         setError(data.error ?? "校验失败");
         return;
       }
-      // Unlocked — go where they wanted (or home).
-      router.replace(from.startsWith("/") ? from : "/");
+      // Unlocked — go where they wanted (or home). Guard against open redirect:
+      // reject scheme-relative (//host) and backslash tricks.
+      const safe =
+        from.startsWith("/") &&
+        !from.startsWith("//") &&
+        !from.startsWith("/\\")
+          ? from
+          : "/";
+      router.replace(safe);
       router.refresh();
     } catch {
       setError("网络错误，请稍后再试");

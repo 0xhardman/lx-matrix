@@ -20,13 +20,19 @@ export function InviteManager() {
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState("");
 
-  // Try the cookie first (returning member, no need to paste token).
+  // Try the cookie first (returning member); or bootstrap from a pasted token
+  // via PUT (token goes in the body, never the URL).
   const tryLoad = useCallback(async (withToken?: string) => {
     setLoading(true);
     setError("");
     try {
-      const qs = withToken ? `?token=${encodeURIComponent(withToken)}` : "";
-      const res = await fetch(`/api/invite${qs}`);
+      const res = withToken
+        ? await fetch("/api/invite", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: withToken }),
+          })
+        : await fetch("/api/invite");
       if (!res.ok) {
         if (!withToken) {
           // No valid cookie — show the token entry, no error.

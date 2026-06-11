@@ -69,8 +69,28 @@ export interface Application {
   status: ApplicationStatus;
   member_token: string | null;
   invite_code_used: string | null;
+  // Cached public Twitter profile, refreshed by the snapshot cron.
+  display_name: string | null;
+  avatar_url: string | null;
+  last_tweets_count: number | null;
+  last_snapshot_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A point-in-time capture of a member's public Twitter counters. Inserted by
+ * the snapshot cron; the daily post count is derived as the delta between
+ * consecutive snapshots.
+ */
+export interface TweetSnapshot {
+  id: number;
+  registration_id: number;
+  twitter: string;
+  tweets_count: number;
+  followers: number | null;
+  following: number | null;
+  captured_at: string;
 }
 
 /**
@@ -115,7 +135,27 @@ export async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS referrer         TEXT,
       ADD COLUMN IF NOT EXISTS status           TEXT NOT NULL DEFAULT 'pending',
       ADD COLUMN IF NOT EXISTS member_token     TEXT,
-      ADD COLUMN IF NOT EXISTS invite_code_used TEXT;
+      ADD COLUMN IF NOT EXISTS invite_code_used TEXT,
+      -- Cached public Twitter profile, refreshed by the snapshot cron.
+      ADD COLUMN IF NOT EXISTS display_name      TEXT,
+      ADD COLUMN IF NOT EXISTS avatar_url        TEXT,
+      ADD COLUMN IF NOT EXISTS last_tweets_count INTEGER,
+      ADD COLUMN IF NOT EXISTS last_snapshot_at  TIMESTAMPTZ;
+
+    -- Per-run capture of each member's public Twitter counters. The daily
+    -- posting volume is computed as the delta between consecutive snapshots.
+    CREATE TABLE IF NOT EXISTS tweet_snapshots (
+      id              BIGSERIAL PRIMARY KEY,
+      registration_id BIGINT NOT NULL
+        REFERENCES twitter_registrations (id) ON DELETE CASCADE,
+      twitter         TEXT NOT NULL,
+      tweets_count    INTEGER NOT NULL,
+      followers       INTEGER,
+      following       INTEGER,
+      captured_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS tweet_snapshots_reg_captured_idx
+      ON tweet_snapshots (registration_id, captured_at DESC);
 
     -- Invite codes: single-use, time-limited.
     CREATE TABLE IF NOT EXISTS invite_codes (

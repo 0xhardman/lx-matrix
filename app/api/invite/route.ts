@@ -35,34 +35,49 @@ function setMemberCookie(res: NextResponse, token: string) {
   });
 }
 
-/**
- * GET — list this member's invite codes (and refresh the member cookie).
- * Token via ?token= or the lx_member cookie.
- */
-export async function GET(request: Request) {
-  await ensureSchema();
-  const url = new URL(request.url);
-  const store = await cookies();
-  const token =
-    url.searchParams.get("token") || store.get(MEMBER_COOKIE)?.value || "";
-
+async function listCodesResponse(token: string) {
   const member = await resolveMember(token);
   if (!member) {
     return NextResponse.json({ error: "无效的成员凭证" }, { status: 401 });
   }
-
   const { rows } = await getPool().query(
     `SELECT code, expires_at, used_at, used_by_twitter, created_at
      FROM invite_codes WHERE created_by = $1 ORDER BY created_at DESC`,
     [member.member_token]
   );
-
   const res = NextResponse.json({
     member: { twitter: member.twitter },
     codes: rows,
   });
   setMemberCookie(res, token);
   return res;
+}
+
+/**
+ * GET — list this member's invite codes using the httpOnly lx_member cookie.
+ * (No token in the query string — that would leak it into logs/history.)
+ */
+export async function GET() {
+  await ensureSchema();
+  const store = await cookies();
+  const token = store.get(MEMBER_COOKIE)?.value || "";
+  return listCodesResponse(token);
+}
+
+/**
+ * PUT — bootstrap a session from a pasted token (token in the JSON body, not
+ * the URL). Sets the member cookie and returns the code list.
+ */
+export async function PUT(request: Request) {
+  await ensureSchema();
+  let body: { token?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  return listCodesResponse(token);
 }
 
 /**
