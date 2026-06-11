@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GATE_COOKIE, MEMBER_COOKIE, verifyGatePass } from "@/app/lib/gate";
+import { SESSION_COOKIE, readSession } from "@/app/lib/session";
 
 // Pages that require an invite (or member) to view.
 const GATED_PATHS = ["/", "/rules"];
@@ -14,8 +15,11 @@ export async function middleware(req: NextRequest) {
 
   const hasGatePass = await verifyGatePass(req.cookies.get(GATE_COOKIE)?.value);
   const hasMember = Boolean(req.cookies.get(MEMBER_COOKIE)?.value);
+  const hasSession = Boolean(
+    await readSession(req.cookies.get(SESSION_COOKIE)?.value)
+  );
 
-  if (hasGatePass || hasMember) return NextResponse.next();
+  if (hasGatePass || hasMember || hasSession) return NextResponse.next();
 
   // Not unlocked — send to the gate, remembering where they wanted to go.
   const url = req.nextUrl.clone();

@@ -1,0 +1,35 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "LXDAO 矩阵 · 蓝V互推 💗" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - img "LXDAO" [ref=e5]
+        - generic [ref=e6]: 矩阵 · 蓝V互推 💗
+      - navigation [ref=e7]:
+        - link "群规则" [ref=e8] [cursor=pointer]:
+          - /url: /rules
+        - link "申请加入" [ref=e9] [cursor=pointer]:
+          - /url: /register
+        - link "申请加入" [ref=e10] [cursor=pointer]:
+          - /url: /register
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: 🔒
+      - heading "邀请制 · 凭码进入" [level=1] [ref=e14]
+      - paragraph [ref=e15]: LX 矩阵蓝V互推是小而精的邀请制社群。请输入邀请码进入；拿到邀请码后，可在站内提交入群申请。
+      - generic [ref=e16]:
+        - textbox "输入邀请码，如 LX-7F3K9Q" [ref=e17]: LX-GB39GG
+        - button "进入" [ref=e18]
+        - paragraph [ref=e19]: 没有邀请码？请向已加入的群友索取。
+  - contentinfo [ref=e20]:
+    - generic [ref=e21]:
+      - paragraph [ref=e22]:
+        - text: LX 矩阵 · 蓝V互推 💗 Built by
+        - link "LXDAO" [ref=e23] [cursor=pointer]:
+          - /url: https://lxdao.io
+      - navigation [ref=e24]:
+        - link "群规则" [ref=e25] [cursor=pointer]:
+          - /url: /rules
+        - link "申请加入" [ref=e26] [cursor=pointer]:
+          - /url: /register
+  - alert [ref=e27]

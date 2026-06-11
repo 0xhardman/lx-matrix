@@ -4,6 +4,7 @@ import Link from "next/link";
 const navItems = [
   { href: "/rules", label: "群规则" },
   { href: "/register", label: "申请加入" },
+  { href: "/login", label: "登录" },
 ];
 
 export function SiteHeader() {
