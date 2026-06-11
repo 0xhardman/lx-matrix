@@ -7,6 +7,12 @@ export const GATE_CODE_COOKIE = "lx_gate_code"; // which code unlocked
 export const MEMBER_COOKIE = "lx_member"; // approved member token
 
 /**
+ * Cookies must be `secure` in production (HTTPS), but NOT over local http,
+ * otherwise the browser silently drops them and local testing can't work.
+ */
+export const cookieSecure = process.env.NODE_ENV === "production";
+
+/**
  * Default invite-code lifetime, in hours. Overridable via INVITE_TTL_HOURS.
  */
 export function inviteTtlHours(): number {

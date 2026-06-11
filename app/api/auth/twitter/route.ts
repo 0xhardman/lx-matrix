@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookieSecure } from "@/app/lib/gate";
 import {
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
   const res = NextResponse.redirect(`${AUTHORIZE_URL}?${params.toString()}`);
   const cookieOpts = {
     httpOnly: true,
-    secure: true,
+    secure: cookieSecure,
     sameSite: "lax" as const,
     path: "/",
     maxAge: 600, // 10 min to complete the flow

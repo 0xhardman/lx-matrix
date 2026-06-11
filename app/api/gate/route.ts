@@ -5,6 +5,7 @@ import {
   GATE_CODE_COOKIE,
   makeGatePass,
   normalizeCode,
+  cookieSecure,
 } from "@/app/lib/gate";
 
 export const runtime = "nodejs";
@@ -51,14 +52,14 @@ export async function POST(request: Request) {
     // Remember which code unlocked, so /register can burn it on submit.
     res.cookies.set(GATE_COOKIE, await makeGatePass(), {
       httpOnly: true,
-      secure: true,
+      secure: cookieSecure,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24, // 1 day browsing pass
     });
     res.cookies.set(GATE_CODE_COOKIE, code, {
       httpOnly: true,
-      secure: true,
+      secure: cookieSecure,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24,

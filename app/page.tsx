@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { MEMBER_COOKIE } from "@/app/lib/gate";
 
 const highlights = [
   {
@@ -15,7 +17,9 @@ const highlights = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const store = await cookies();
+  const isMember = Boolean(store.get(MEMBER_COOKIE)?.value);
   return (
     <div>
       {/* Hero */}
@@ -33,12 +37,21 @@ export default function Home() {
             LXDAO 互推社群，聚焦 Web3 / AI / 技术 / 投研。
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/register"
-              className="w-full rounded-md bg-primary px-7 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85 sm:w-auto"
-            >
-              申请加入
-            </Link>
+            {isMember ? (
+              <Link
+                href="/invite"
+                className="w-full rounded-md bg-primary px-7 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85 sm:w-auto"
+              >
+                我的邀请码
+              </Link>
+            ) : (
+              <Link
+                href="/register"
+                className="w-full rounded-md bg-primary px-7 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85 sm:w-auto"
+              >
+                申请加入
+              </Link>
+            )}
             <Link
               href="/rules"
               className="w-full rounded-md border border-divider bg-background px-7 py-3 text-base font-semibold text-foreground transition-colors hover:bg-alternate-dark sm:w-auto"
@@ -64,25 +77,46 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="mx-auto max-w-[1216px] px-5 pb-20">
-        <div className="flex flex-col items-center justify-between gap-6 rounded-xl bg-primary px-8 py-12 text-center sm:flex-row sm:text-left">
-          <div>
-            <h2 className="text-2xl font-bold text-white sm:text-3xl">
-              准备好加入了吗？
-            </h2>
-            <p className="mt-2 text-white/70">
-              填写申请信息，通过 review 后我们会与你联系。
-            </p>
+      {/* CTA — members are already in, so only show the apply prompt to guests. */}
+      {isMember ? (
+        <section className="mx-auto max-w-[1216px] px-5 pb-20">
+          <div className="flex flex-col items-center justify-between gap-6 rounded-xl bg-primary px-8 py-12 text-center sm:flex-row sm:text-left">
+            <div>
+              <h2 className="text-2xl font-bold text-white sm:text-3xl">
+                邀请你的朋友加入
+              </h2>
+              <p className="mt-2 text-white/70">
+                生成邀请码分享出去，一起把流量做起来 💗
+              </p>
+            </div>
+            <Link
+              href="/invite"
+              className="shrink-0 rounded-md bg-secondary px-7 py-3 text-base font-semibold text-black transition-opacity hover:opacity-85"
+            >
+              生成邀请码 →
+            </Link>
           </div>
-          <Link
-            href="/register"
-            className="shrink-0 rounded-md bg-secondary px-7 py-3 text-base font-semibold text-black transition-opacity hover:opacity-85"
-          >
-            去申请 →
-          </Link>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="mx-auto max-w-[1216px] px-5 pb-20">
+          <div className="flex flex-col items-center justify-between gap-6 rounded-xl bg-primary px-8 py-12 text-center sm:flex-row sm:text-left">
+            <div>
+              <h2 className="text-2xl font-bold text-white sm:text-3xl">
+                准备好加入了吗？
+              </h2>
+              <p className="mt-2 text-white/70">
+                填写申请信息，通过 review 后我们会与你联系。
+              </p>
+            </div>
+            <Link
+              href="/register"
+              className="shrink-0 rounded-md bg-secondary px-7 py-3 text-base font-semibold text-black transition-opacity hover:opacity-85"
+            >
+              去申请 →
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

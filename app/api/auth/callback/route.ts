@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
-import { MEMBER_COOKIE, GATE_COOKIE, makeGatePass } from "@/app/lib/gate";
+import {
+  MEMBER_COOKIE,
+  GATE_COOKIE,
+  makeGatePass,
+  cookieSecure,
+} from "@/app/lib/gate";
 import {
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
@@ -128,7 +133,7 @@ export async function GET(request: Request) {
     await signSession({ twitter: handle, name, avatar, isMember }),
     {
       httpOnly: true,
-      secure: true,
+      secure: cookieSecure,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
@@ -142,7 +147,7 @@ export async function GET(request: Request) {
   if (isMember) {
     res.cookies.set(GATE_COOKIE, await makeGatePass(), {
       httpOnly: true,
-      secure: true,
+      secure: cookieSecure,
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
@@ -150,7 +155,7 @@ export async function GET(request: Request) {
     if (memberToken) {
       res.cookies.set(MEMBER_COOKIE, memberToken, {
         httpOnly: true,
-        secure: true,
+        secure: cookieSecure,
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 180,
