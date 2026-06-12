@@ -308,3 +308,74 @@ body {
   padding: 8px 14px;
   cursor: pointer;
 }
+
+/* --- tabs --- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.tab {
+  flex: 1;
+  padding: 7px 0;
+  border: none;
+  border-radius: 7px;
+  background: var(--row);
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* --- feed cards --- */
+.tweet {
+  display: flex;
+  gap: 10px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.tweet-body {
+  flex: 1;
+  min-width: 0;
+}
+.tweet-text {
+  margin-top: 3px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tweet-foot {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.counts {
+  color: var(--muted);
+  font-size: 12px;
+}
+.go-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  text-decoration: none;
+}
+.go-btn:hover {
+  opacity: 0.88;
+}

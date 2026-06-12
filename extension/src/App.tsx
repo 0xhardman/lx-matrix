@@ -1,33 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
-import { fetchMembers } from "./api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchFeed, fetchMembers } from "./api";
 import { loadSettings, saveSettings } from "./storage";
-import type { Member, Settings } from "./types";
+import type { FeedItem, Member, Settings } from "./types";
 
+type Tab = "feed" | "members";
 type Status = "loading" | "ready" | "error" | "needs-setup";
 
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [status, setStatus] = useState<Status>("loading");
-  const [error, setError] = useState("");
+  const [tab, setTab] = useState<Tab>("feed");
   const [showSettings, setShowSettings] = useState(false);
 
-  // Initial load: read saved settings, then fetch if configured.
-  useEffect(() => {
-    loadSettings().then((s) => {
-      setSettings(s);
-      if (!s.apiBase || !s.token) {
-        setStatus("needs-setup");
-        setShowSettings(true);
-      } else {
-        void refresh(s);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [feedAt, setFeedAt] = useState<string | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+
+  const [status, setStatus] = useState<Status>("loading");
+  const [error, setError] = useState("");
+
+  const loadFeed = useCallback(async (s: Settings, force = false) => {
+    setStatus("loading");
+    setError("");
+    try {
+      const data = await fetchFeed(s, force);
+      setFeed(data.items);
+      setFeedAt(data.refreshedAt);
+      setStatus("ready");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "未知错误");
+      setStatus("error");
+    }
   }, []);
 
-  async function refresh(s: Settings) {
+  const loadMembers = useCallback(async (s: Settings) => {
     setStatus("loading");
     setError("");
     try {
@@ -39,23 +45,47 @@ export function App() {
       setError(e instanceof Error ? e.message : "未知错误");
       setStatus("error");
     }
+  }, []);
+
+  useEffect(() => {
+    loadSettings().then((s) => {
+      setSettings(s);
+      if (!s.apiBase || !s.token) {
+        setStatus("needs-setup");
+        setShowSettings(true);
+      } else {
+        void loadFeed(s);
+      }
+    });
+  }, [loadFeed]);
+
+  function switchTab(t: Tab) {
+    if (t === tab || !settings) return;
+    setTab(t);
+    if (t === "feed") void loadFeed(settings);
+    else void loadMembers(settings);
   }
 
-  const sorted = useMemo(() => sortMembers(members), [members]);
-  const stats = useMemo(() => summarize(members), [members]);
+  function refresh() {
+    if (!settings) return;
+    if (tab === "feed") void loadFeed(settings, true);
+    else void loadMembers(settings);
+  }
+
+  const sortedMembers = useMemo(() => sortMembers(members), [members]);
 
   if (!settings) return <div className="app loading">加载中…</div>;
 
   return (
     <div className="app">
       <header className="bar">
-        <div className="title">LX 矩阵 · 成员监控</div>
+        <div className="title">LX 矩阵</div>
         <div className="actions">
           <button
             className="icon-btn"
             title="刷新"
             disabled={status === "loading"}
-            onClick={() => refresh(settings)}
+            onClick={refresh}
           >
             ↻
           </button>
@@ -69,14 +99,14 @@ export function App() {
         </div>
       </header>
 
-      {showSettings && (
+      {showSettings ? (
         <SettingsPanel
           initial={settings}
           onSave={async (s) => {
             await saveSettings(s);
             setSettings(s);
             setShowSettings(false);
-            void refresh(s);
+            void loadFeed(s);
           }}
           onClose={
             settings.apiBase && settings.token
@@ -84,44 +114,103 @@ export function App() {
               : undefined
           }
         />
-      )}
-
-      {!showSettings && (
+      ) : (
         <>
-          {status === "ready" && (
-            <div className="summary">
-              <span className="ok">✅ {stats.posted} 已发</span>
-              <span className="muted">·</span>
-              <span className="warn">⚪ {stats.notPosted} 未发</span>
-              <span className="muted">·</span>
-              <span className="muted">共 {members.length} 人</span>
-            </div>
-          )}
+          <nav className="tabs">
+            <button
+              className={tab === "feed" ? "tab active" : "tab"}
+              onClick={() => switchTab("feed")}
+            >
+              动态
+            </button>
+            <button
+              className={tab === "members" ? "tab active" : "tab"}
+              onClick={() => switchTab("members")}
+            >
+              成员
+            </button>
+          </nav>
 
           {status === "loading" && <div className="hint">加载中…</div>}
           {status === "error" && (
             <div className="hint error-text">
               {error}
-              <button className="link-btn" onClick={() => refresh(settings)}>
+              <button className="link-btn" onClick={refresh}>
                 重试
               </button>
             </div>
           )}
 
-          {status === "ready" && (
-            <ul className="list">
-              {sorted.map((m) => (
-                <MemberRow key={m.twitter} m={m} />
-              ))}
-            </ul>
+          {status === "ready" && tab === "feed" && (
+            <>
+              {feed.length === 0 ? (
+                <div className="hint">暂时没有动态，过会儿再看看。</div>
+              ) : (
+                <ul className="list">
+                  {feed.map((t) => (
+                    <FeedCard key={t.tweet_id} t={t} />
+                  ))}
+                </ul>
+              )}
+              {feedAt && (
+                <footer className="foot">动态更新于 {formatTime(feedAt)}</footer>
+              )}
+            </>
           )}
 
-          {status === "ready" && generatedAt && (
-            <footer className="foot">数据更新于 {formatTime(generatedAt)}</footer>
+          {status === "ready" && tab === "members" && (
+            <>
+              <ul className="list">
+                {sortedMembers.map((m) => (
+                  <MemberRow key={m.twitter} m={m} />
+                ))}
+              </ul>
+              {generatedAt && (
+                <footer className="foot">数据更新于 {formatTime(generatedAt)}</footer>
+              )}
+            </>
           )}
         </>
       )}
     </div>
+  );
+}
+
+function FeedCard({ t }: { t: FeedItem }) {
+  const handle = t.twitter.replace(/^@/, "");
+  return (
+    <li className="tweet">
+      <a
+        className="avatar-link"
+        href={`https://x.com/${handle}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {t.author_avatar ? (
+          <img className="avatar" src={t.author_avatar} alt="" />
+        ) : (
+          <div className="avatar placeholder">{handle[0]?.toUpperCase()}</div>
+        )}
+      </a>
+      <div className="tweet-body">
+        <div className="name-line">
+          <span className="name">{t.author_name || t.twitter}</span>
+          <span className="sub dim">@{handle}</span>
+          {t.tweet_at && <span className="dim"> · {timeAgo(t.tweet_at)}</span>}
+          {t.is_quote && <span className="freq">引用</span>}
+        </div>
+        {t.text && <div className="tweet-text">{t.text}</div>}
+        <div className="tweet-foot">
+          <span className="counts">
+            ♥ {fmt(t.like_count)} · 💬 {fmt(t.reply_count)} · 🔁{" "}
+            {fmt(t.retweet_count)}
+          </span>
+          <a className="go-btn" href={t.url} target="_blank" rel="noreferrer">
+            去互动 ↗
+          </a>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -143,20 +232,10 @@ function MemberRow({ m }: { m: Member }) {
       </a>
       <div className="meta">
         <div className="name-line">
-          <a
-            className="name"
-            href={`https://x.com/${handle}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {m.name || m.twitter}
-          </a>
+          <span className="name">{m.name || m.twitter}</span>
           {m.frequency && <span className="freq">{m.frequency}</span>}
         </div>
-        <div className="sub">
-          @{handle}
-          {m.cumulative != null && <span className="dim"> · 共 {m.cumulative} 帖</span>}
-        </div>
+        <div className="sub">@{handle}</div>
       </div>
       <TodayBadge m={m} />
     </li>
@@ -209,9 +288,7 @@ function SettingsPanel({
         <button
           className="primary"
           disabled={!apiBase.trim() || !token.trim()}
-          onClick={() =>
-            onSave({ apiBase: apiBase.trim(), token: token.trim() })
-          }
+          onClick={() => onSave({ apiBase: apiBase.trim(), token: token.trim() })}
         >
           保存
         </button>
@@ -225,8 +302,7 @@ function SettingsPanel({
   );
 }
 
-// "未发" first so the people who need a nudge are at the top; within a group,
-// order by handle.
+// "未发" first so the people who need a nudge are at the top.
 function sortMembers(members: Member[]): Member[] {
   const rank = (m: Member) => (m.postedToday ? 1 : 0);
   return [...members].sort(
@@ -236,14 +312,22 @@ function sortMembers(members: Member[]): Member[] {
   );
 }
 
-function summarize(members: Member[]) {
-  let posted = 0;
-  let notPosted = 0;
-  for (const m of members) {
-    if (m.postedToday) posted++;
-    else notPosted++;
-  }
-  return { posted, notPosted };
+function fmt(n: number | null): string {
+  if (n == null) return "0";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(n);
+}
+
+function timeAgo(iso: string): string {
+  const d = new Date(iso).getTime();
+  if (Number.isNaN(d)) return "";
+  const mins = Math.floor((Date.now() - d) / 60000);
+  if (mins < 1) return "刚刚";
+  if (mins < 60) return `${mins} 分钟前`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} 小时前`;
+  const days = Math.floor(hrs / 24);
+  return `${days} 天前`;
 }
 
 function formatTime(iso: string): string {

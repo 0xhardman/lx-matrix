@@ -77,3 +77,70 @@ export async function fetchTwitterProfile(
     return null;
   }
 }
+
+export interface MemberTweet {
+  id: string;
+  text: string;
+  createdAt: string; // ISO
+  likes: number;
+  retweets: number;
+  replies: number;
+  quotes: number;
+  views: number;
+  isQuote: boolean;
+  authorName: string;
+  authorHandle: string; // without @
+  authorAvatar: string;
+}
+
+/**
+ * Fetch a member's recent ORIGINAL tweets (excludes pure retweets and replies;
+ * keeps quote tweets since those carry the member's own commentary).
+ * Returns [] on any failure.
+ */
+export async function fetchUserTweets(
+  userId: string,
+  count = 10
+): Promise<MemberTweet[]> {
+  const key = process.env.XAPI_KEY;
+  if (!key || !userId) return [];
+
+  try {
+    const res = await fetch(XAPI_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "XAPI-Key": key },
+      body: JSON.stringify({
+        action_id: "twitter.user_tweets",
+        input: { user_id: userId, count },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      console.error("[xapi] user_tweets HTTP", res.status);
+      return [];
+    }
+    const j = await res.json();
+    const tweets = j?.data?.tweets;
+    if (!j?.success || !Array.isArray(tweets)) return [];
+
+    return tweets
+      .filter((t) => !t.is_retweet && !t.in_reply_to_status_id)
+      .map((t) => ({
+        id: String(t.id),
+        text: (t.full_text ?? "").trim(),
+        createdAt: t.created_at ? new Date(t.created_at).toISOString() : "",
+        likes: t.favorite_count ?? 0,
+        retweets: t.retweet_count ?? 0,
+        replies: t.reply_count ?? 0,
+        quotes: t.quote_count ?? 0,
+        views: t.views_count ?? 0,
+        isQuote: Boolean(t.is_quote_status),
+        authorName: t.author?.name ?? "",
+        authorHandle: t.author?.screen_name ?? "",
+        authorAvatar: t.author?.avatar ?? "",
+      }));
+  } catch (err) {
+    console.error("[xapi] fetchUserTweets failed:", err);
+    return [];
+  }
+}

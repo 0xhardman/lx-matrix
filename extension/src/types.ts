@@ -17,5 +17,26 @@ export interface MembersResponse {
 
 export interface Settings {
   apiBase: string; // e.g. https://lx-matrix.vercel.app
-  token: string; // member_token
+  token: string; // ext token (ext_...)
+}
+
+export interface FeedItem {
+  tweet_id: string;
+  twitter: string; // @handle
+  author_name: string | null;
+  author_avatar: string | null;
+  text: string | null;
+  tweet_at: string | null;
+  like_count: number | null;
+  retweet_count: number | null;
+  reply_count: number | null;
+  quote_count: number | null;
+  views_count: number | null;
+  is_quote: boolean | null;
+  url: string;
+}
+
+export interface FeedResponse {
+  items: FeedItem[];
+  refreshedAt: string | null;
 }

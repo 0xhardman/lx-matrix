@@ -167,6 +167,28 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS tweet_snapshots_reg_captured_idx
       ON tweet_snapshots (registration_id, captured_at DESC);
 
+    -- Member tweets: recent original tweets cached for the activity feed.
+    -- Refreshed on demand by /api/feed (TTL'd); served to the browser extension.
+    CREATE TABLE IF NOT EXISTS member_tweets (
+      tweet_id        TEXT PRIMARY KEY,
+      registration_id BIGINT NOT NULL
+        REFERENCES twitter_registrations (id) ON DELETE CASCADE,
+      twitter         TEXT NOT NULL,
+      author_name     TEXT,
+      author_avatar   TEXT,
+      text            TEXT,
+      tweet_at        TIMESTAMPTZ,
+      like_count      INTEGER,
+      retweet_count   INTEGER,
+      reply_count     INTEGER,
+      quote_count     INTEGER,
+      views_count     INTEGER,
+      is_quote        BOOLEAN,
+      fetched_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS member_tweets_tweet_at_idx
+      ON member_tweets (tweet_at DESC);
+
     -- Invite codes: single-use, time-limited.
     CREATE TABLE IF NOT EXISTS invite_codes (
       code               TEXT PRIMARY KEY,
