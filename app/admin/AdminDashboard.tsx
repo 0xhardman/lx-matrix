@@ -8,18 +8,21 @@ const STATUS_LABEL: Record<ApplicationStatus, string> = {
   pending: "待审核",
   approved: "已通过",
   rejected: "已拒绝",
+  deactivated: "已停用",
 };
 
 const STATUS_STYLE: Record<ApplicationStatus, string> = {
   pending: "bg-secondary/20 text-secondary-dark",
   approved: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-600",
+  deactivated: "bg-amber-100 text-amber-700",
 };
 
 const FILTERS: { key: "all" | ApplicationStatus; label: string }[] = [
   { key: "pending", label: "待审核" },
   { key: "approved", label: "已通过" },
   { key: "rejected", label: "已拒绝" },
+  { key: "deactivated", label: "已停用" },
   { key: "all", label: "全部" },
 ];
 
@@ -349,6 +352,24 @@ function ApplicationCard({
           >
             拒绝
           </button>
+          {app.status === "approved" && (
+            <button
+              disabled={busy}
+              onClick={() => onUpdate(app.id, "deactivated")}
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-40"
+            >
+              停用
+            </button>
+          )}
+          {app.status === "deactivated" && (
+            <button
+              disabled={busy}
+              onClick={() => onUpdate(app.id, "approved")}
+              className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-85 disabled:opacity-40"
+            >
+              恢复
+            </button>
+          )}
           {app.status !== "pending" && (
             <button
               disabled={busy}
@@ -374,20 +395,6 @@ function ApplicationCard({
         <Field label="所用邀请码">{app.invite_code_used || "—"}</Field>
         <Field label="提交时间">{formatDate(app.created_at)}</Field>
       </dl>
-
-      {app.status === "approved" && app.member_token && (
-        <div className="mt-3 rounded-md border border-green-100 bg-green-50/60 px-4 py-3">
-          <p className="text-xs font-semibold text-green-700">
-            成员凭证（发给 ta，用于进站和生成邀请码）
-          </p>
-          <div className="mt-1.5 flex items-center gap-2">
-            <code className="flex-1 truncate rounded bg-white px-2 py-1 text-xs">
-              {app.member_token}
-            </code>
-            <CopyButton text={app.member_token} />
-          </div>
-        </div>
-      )}
 
       {app.intro && (
         <div className="mt-3 rounded-md bg-alternate px-4 py-3 text-sm leading-relaxed text-foreground">

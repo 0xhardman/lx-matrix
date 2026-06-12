@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, readSession } from "@/app/lib/session";
-import { MEMBER_COOKIE } from "@/app/lib/gate";
 import { LogoutButton } from "./LogoutButton";
 
 const linkClass =
@@ -11,12 +10,8 @@ const linkClass =
 export async function SiteHeader() {
   const store = await cookies();
   const session = await readSession(store.get(SESSION_COOKIE)?.value);
-  const hasMemberCookie = Boolean(store.get(MEMBER_COOKIE)?.value);
-  // A member is anyone whose signed session says so, or who holds a member
-  // token cookie (e.g. entered via /invite without OAuth).
-  const isMember = Boolean(session?.isMember) || hasMemberCookie;
-  // "Logged in" means authenticated by any means — so we always offer logout.
-  const loggedIn = Boolean(session) || hasMemberCookie;
+  const isMember = Boolean(session?.isMember);
+  const loggedIn = Boolean(session);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-divider bg-background/80 backdrop-blur">
@@ -30,7 +25,7 @@ export async function SiteHeader() {
             priority
           />
           <span className="hidden text-sm font-semibold text-muted sm:inline">
-            矩阵 · 蓝V互推 <span className="text-secondary-dark">💗</span>
+矩阵 <span className="text-secondary-dark">💗</span>
           </span>
         </Link>
 

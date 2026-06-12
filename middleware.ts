@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GATE_COOKIE, MEMBER_COOKIE, verifyGatePass } from "@/app/lib/gate";
+import { GATE_COOKIE, verifyGatePass } from "@/app/lib/gate";
 import { SESSION_COOKIE, readSession } from "@/app/lib/session";
 
 // Pages that require an invite (or member) to view.
@@ -14,13 +14,12 @@ export async function middleware(req: NextRequest) {
   if (!isGated) return NextResponse.next();
 
   const hasGatePass = await verifyGatePass(req.cookies.get(GATE_COOKIE)?.value);
-  const hasMember = Boolean(req.cookies.get(MEMBER_COOKIE)?.value);
   // Only an *approved member* session passes the gate — a logged-in non-member
   // must still use an invite code. isMember is signed into the token server-side.
   const session = await readSession(req.cookies.get(SESSION_COOKIE)?.value);
   const isMemberSession = Boolean(session?.isMember);
 
-  if (hasGatePass || hasMember || isMemberSession) {
+  if (hasGatePass || isMemberSession) {
     return NextResponse.next();
   }
 

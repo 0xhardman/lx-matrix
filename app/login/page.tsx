@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, readSession } from "@/app/lib/session";
-import { MEMBER_COOKIE } from "@/app/lib/gate";
 
 export const metadata: Metadata = {
-  title: "登录 | LX 矩阵 · 蓝V互推",
-  description: "用 Twitter 登录 LX 矩阵蓝V互推。",
+  title: "登录 | LX 矩阵",
+  description: "用 Twitter 登录 LX 矩阵。",
 };
 
 export const dynamic = "force-dynamic";
@@ -19,7 +18,7 @@ export default async function LoginPage({
   const sp = await searchParams;
   const store = await cookies();
   const session = await readSession(store.get(SESSION_COOKIE)?.value);
-  const isMember = Boolean(store.get(MEMBER_COOKIE)?.value);
+  const isMember = Boolean(session?.isMember);
 
   return (
     <div className="mx-auto flex max-w-[460px] flex-col items-center px-5 py-20 text-center">

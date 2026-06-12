@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ADMIN_COOKIE, verifyToken } from "@/app/lib/auth";
 import { ensureSchema, getPool, type ApplicationStatus } from "@/app/lib/db";
-import { generateMemberToken } from "@/app/lib/gate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_STATUS: ApplicationStatus[] = ["pending", "approved", "rejected"];
+const VALID_STATUS: ApplicationStatus[] = [
+  "pending",
+  "approved",
+  "rejected",
+  "deactivated",
+];
 
 async function requireAdmin(): Promise<boolean> {
   const store = await cookies();
@@ -21,12 +25,13 @@ export async function GET() {
   try {
     await ensureSchema();
     const { rows } = await getPool().query(
-      `SELECT id, twitter, wechat, has_blue_v, is_lxdao_member, lxdao_proof,
-              directions, frequency, intro, referrer, status,
-              member_token, invite_code_used, created_at, updated_at
+      `SELECT id, twitter, twitter_id, wechat, has_blue_v, is_lxdao_member,
+              lxdao_proof, directions, frequency, intro, referrer, status,
+              invite_code_used, created_at, updated_at
        FROM twitter_registrations
        ORDER BY
-         CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+         CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1
+              WHEN 'deactivated' THEN 2 ELSE 3 END,
          created_at DESC`
     );
     return NextResponse.json({ applications: rows });
@@ -56,24 +61,16 @@ export async function PATCH(request: Request) {
 
   try {
     await ensureSchema();
-    // On approval, issue a member_token once (if not already set) so the
-    // member can access the site and mint invite codes.
-    const { rows } = await getPool().query(
-      `UPDATE twitter_registrations
-       SET status = $1,
-           member_token = CASE
-             WHEN $1 = 'approved' AND member_token IS NULL THEN $3
-             ELSE member_token
-           END,
-           updated_at = now()
-       WHERE id = $2
-       RETURNING member_token`,
-      [status, id, generateMemberToken()]
+    // Membership is derived from status='approved' and matched by twitter_id
+    // at login — no per-member token to issue.
+    const { rowCount } = await getPool().query(
+      `UPDATE twitter_registrations SET status = $1, updated_at = now() WHERE id = $2`,
+      [status, id]
     );
-    if (rows.length === 0) {
+    if (rowCount === 0) {
       return NextResponse.json({ error: "记录不存在" }, { status: 404 });
     }
-    return NextResponse.json({ ok: true, member_token: rows[0].member_token });
+    return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[admin] failed to update status:", err);
     return NextResponse.json({ error: "更新失败" }, { status: 500 });

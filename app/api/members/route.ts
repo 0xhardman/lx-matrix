@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
-import { MEMBER_COOKIE } from "@/app/lib/gate";
+import { SESSION_COOKIE, readSession } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,36 +22,27 @@ interface MemberRow {
   baseline_count: number | null;
 }
 
-/**
- * Read the member token from the httpOnly `lx_member` cookie or the
- * `x-member-token` header. Never from the URL (would leak into logs/history).
- */
-async function readToken(request: Request): Promise<string> {
-  const header = request.headers.get("x-member-token");
-  if (header) return header.trim();
+export async function GET() {
+  // Only approved members (by OAuth session, re-checked against the DB) may
+  // read the member directory.
   const store = await cookies();
-  return store.get(MEMBER_COOKIE)?.value?.trim() || "";
-}
-
-export async function GET(request: Request) {
-  const token = await readToken(request);
-  if (!token) {
-    return NextResponse.json({ error: "缺少成员令牌" }, { status: 401 });
+  const session = await readSession(store.get(SESSION_COOKIE)?.value);
+  if (!session?.twitterId) {
+    return NextResponse.json({ error: "请先登录" }, { status: 401 });
   }
 
   try {
     await ensureSchema();
     const pool = getPool();
 
-    // Validate the caller is an approved member.
     const auth = await pool.query(
       `SELECT 1 FROM twitter_registrations
-        WHERE member_token = $1 AND status = 'approved'
+        WHERE twitter_id = $1 AND status = 'approved'
         LIMIT 1`,
-      [token]
+      [session.twitterId]
     );
     if (auth.rowCount === 0) {
-      return NextResponse.json({ error: "令牌无效" }, { status: 401 });
+      return NextResponse.json({ error: "不是成员" }, { status: 401 });
     }
 
     // For each approved member, pull the cached current counter plus the

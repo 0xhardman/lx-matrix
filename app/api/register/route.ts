@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
 import { GATE_CODE_COOKIE, normalizeCode } from "@/app/lib/gate";
+import { SESSION_COOKIE, readSession } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,33 +10,25 @@ export const dynamic = "force-dynamic";
 const VALID_DIRECTIONS = ["Web3", "AI", "技术", "投研"];
 const VALID_FREQUENCIES = ["日更", "周更", "不定期"];
 
-/**
- * Normalize a Twitter input into a clean @handle.
- * Accepts a full URL (https://x.com/foo), "@foo", or "foo".
- * Returns null if no plausible handle can be extracted.
- */
-function normalizeTwitter(raw: string): string | null {
-  let v = raw.trim();
-  if (!v) return null;
-
-  const urlMatch = v.match(
-    /(?:twitter\.com|x\.com)\/(?:#!\/)?@?([A-Za-z0-9_]{1,15})/i
-  );
-  if (urlMatch) {
-    v = urlMatch[1];
-  } else {
-    v = v.replace(/^@/, "");
-  }
-
-  if (!/^[A-Za-z0-9_]{1,15}$/.test(v)) return null;
-  return `@${v}`;
-}
-
 function asString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
 export async function POST(request: Request) {
+  // Identity comes from the OAuth session — the applicant must be logged in,
+  // so the Twitter account is verified (not self-typed) and we capture the
+  // stable user id.
+  const store = await cookies();
+  const session = await readSession(store.get(SESSION_COOKIE)?.value);
+  if (!session?.twitterId) {
+    return NextResponse.json(
+      { error: "请先用 Twitter 登录，再提交申请" },
+      { status: 401 }
+    );
+  }
+  const twitter = session.twitter;
+  const twitterId = session.twitterId;
+
   let p: Record<string, unknown>;
   try {
     p = await request.json();
@@ -44,7 +37,6 @@ export async function POST(request: Request) {
   }
 
   // --- parse & validate ---
-  const twitter = normalizeTwitter(asString(p.twitter));
   const wechat = asString(p.wechat);
   const hasBlueV = p.hasBlueV === true;
   const isLxdaoMember = p.isLxdaoMember === true;
@@ -59,12 +51,6 @@ export async function POST(request: Request) {
   const intro = asString(p.intro);
   const referrer = asString(p.referrer) || null;
 
-  if (!twitter) {
-    return NextResponse.json(
-      { error: "请填写有效的 Twitter 账号或链接" },
-      { status: 400 }
-    );
-  }
   if (!wechat) {
     return NextResponse.json({ error: "请填写微信名称" }, { status: 400 });
   }
@@ -109,7 +95,6 @@ export async function POST(request: Request) {
   }
 
   // Invite code: read from the gate cookie (set when the visitor unlocked).
-  const store = await cookies();
   const inviteCode = normalizeCode(store.get(GATE_CODE_COOKIE)?.value ?? "");
   if (!inviteCode) {
     return NextResponse.json(
@@ -143,39 +128,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "邀请码已过期" }, { status: 410 });
     }
 
-    // Upsert the application. Re-applying resets status to pending.
-    await client.query(
-      `
-      INSERT INTO twitter_registrations
-        (twitter, wechat, has_blue_v, is_lxdao_member, lxdao_proof,
-         directions, frequency, intro, referrer, status, invite_code_used)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10)
-      ON CONFLICT (lower(twitter)) DO UPDATE SET
-        wechat = EXCLUDED.wechat,
-        has_blue_v = EXCLUDED.has_blue_v,
-        is_lxdao_member = EXCLUDED.is_lxdao_member,
-        lxdao_proof = EXCLUDED.lxdao_proof,
-        directions = EXCLUDED.directions,
-        frequency = EXCLUDED.frequency,
-        intro = EXCLUDED.intro,
-        referrer = EXCLUDED.referrer,
-        status = 'pending',
-        invite_code_used = EXCLUDED.invite_code_used,
-        updated_at = now()
-      `,
-      [
-        twitter,
-        wechat,
-        hasBlueV,
-        isLxdaoMember,
-        lxdaoProof,
-        directions,
-        frequency,
-        intro,
-        referrer,
-        inviteCode,
-      ]
+    // Upsert by stable twitter_id (the identity). Re-applying resets to pending.
+    const fields = [
+      wechat,
+      hasBlueV,
+      isLxdaoMember,
+      lxdaoProof,
+      directions,
+      frequency,
+      intro,
+      referrer,
+      inviteCode,
+      twitter,
+      twitterId,
+    ];
+    const existing = await client.query(
+      `SELECT id FROM twitter_registrations WHERE twitter_id = $1`,
+      [twitterId]
     );
+    if (existing.rows[0]) {
+      await client.query(
+        `UPDATE twitter_registrations SET
+           wechat = $1, has_blue_v = $2, is_lxdao_member = $3, lxdao_proof = $4,
+           directions = $5, frequency = $6, intro = $7, referrer = $8,
+           invite_code_used = $9, twitter = $10, status = 'pending',
+           updated_at = now()
+         WHERE twitter_id = $11`,
+        fields
+      );
+    } else {
+      await client.query(
+        `INSERT INTO twitter_registrations
+           (wechat, has_blue_v, is_lxdao_member, lxdao_proof, directions,
+            frequency, intro, referrer, invite_code_used, twitter, twitter_id,
+            status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending')`,
+        fields
+      );
+    }
 
     // Burn the code.
     await client.query(

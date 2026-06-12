@@ -42,7 +42,8 @@ async function hmac(message: string): Promise<string> {
 }
 
 export interface SessionData {
-  twitter: string; // @handle
+  twitterId: string; // stable Twitter user id (identity key)
+  twitter: string; // @handle (display only)
   name?: string;
   avatar?: string;
   // Membership status, set server-side from the DB at login. Signed into the

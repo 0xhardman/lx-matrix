@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
-import {
-  MEMBER_COOKIE,
-  GATE_COOKIE,
-  makeGatePass,
-  cookieSecure,
-} from "@/app/lib/gate";
+import { GATE_COOKIE, makeGatePass, cookieSecure } from "@/app/lib/gate";
 import {
   OAUTH_STATE_COOKIE,
   OAUTH_VERIFIER_COOKIE,
@@ -86,7 +81,8 @@ export async function GET(request: Request) {
     return fail(request, "token_exchange");
   }
 
-  // Fetch the authenticated user.
+  // Fetch the authenticated user (id is the stable identity key).
+  let twitterId: string;
   let handle: string;
   let name: string | undefined;
   let avatar: string | undefined;
@@ -99,6 +95,7 @@ export async function GET(request: Request) {
       return fail(request, "user_fetch");
     }
     const me = (await meRes.json()).data;
+    twitterId = String(me.id);
     handle = "@" + me.username;
     name = me.name;
     avatar = me.profile_image_url;
@@ -107,20 +104,38 @@ export async function GET(request: Request) {
     return fail(request, "user_fetch");
   }
 
-  // Look up membership by Twitter handle.
+  // Look up membership by stable twitter_id, falling back to handle for legacy
+  // rows that predate id capture. On a handle-match, backfill the id and keep
+  // the handle current.
   let isMember = false;
-  let memberToken: string | null = null;
   try {
     await ensureSchema();
-    const { rows } = await getPool().query(
-      `SELECT status, member_token FROM twitter_registrations
-       WHERE lower(twitter) = lower($1)`,
-      [handle]
+    const pool = getPool();
+    let { rows } = await pool.query(
+      `SELECT id, status FROM twitter_registrations WHERE twitter_id = $1`,
+      [twitterId]
     );
-    if (rows[0]?.status === "approved") {
-      isMember = true;
-      memberToken = rows[0].member_token;
+    if (rows.length === 0) {
+      // Legacy fallback: match by handle, then backfill the id.
+      const byHandle = await pool.query(
+        `SELECT id, status FROM twitter_registrations WHERE lower(twitter) = lower($1)`,
+        [handle]
+      );
+      if (byHandle.rows[0]) {
+        rows = byHandle.rows;
+        await pool.query(
+          `UPDATE twitter_registrations SET twitter_id = $1, twitter = $2, updated_at = now() WHERE id = $3`,
+          [twitterId, handle, byHandle.rows[0].id]
+        );
+      }
+    } else {
+      // Keep the display handle fresh in case it changed.
+      await pool.query(
+        `UPDATE twitter_registrations SET twitter = $1, updated_at = now() WHERE id = $2`,
+        [handle, rows[0].id]
+      );
     }
+    isMember = rows[0]?.status === "approved";
   } catch (err) {
     console.error("[oauth] membership lookup failed:", err);
   }
@@ -130,7 +145,7 @@ export async function GET(request: Request) {
   const res = NextResponse.redirect(new URL(dest, baseUrl(request)));
   res.cookies.set(
     SESSION_COOKIE,
-    await signSession({ twitter: handle, name, avatar, isMember }),
+    await signSession({ twitterId, twitter: handle, name, avatar, isMember }),
     {
       httpOnly: true,
       secure: cookieSecure,
@@ -142,8 +157,7 @@ export async function GET(request: Request) {
   res.cookies.delete(OAUTH_STATE_COOKIE);
   res.cookies.delete(OAUTH_VERIFIER_COOKIE);
 
-  // Approved members also get the gate pass + member cookie so they can browse
-  // the gated pages and use /invite without entering an invite code.
+  // Approved members get a gate pass so middleware lets them browse gated pages.
   if (isMember) {
     res.cookies.set(GATE_COOKIE, await makeGatePass(), {
       httpOnly: true,
@@ -152,15 +166,6 @@ export async function GET(request: Request) {
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
     });
-    if (memberToken) {
-      res.cookies.set(MEMBER_COOKIE, memberToken, {
-        httpOnly: true,
-        secure: cookieSecure,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 180,
-      });
-    }
   }
   return res;
 }

@@ -41,19 +41,6 @@ export function normalizeCode(raw: string): string {
   return raw.trim().toUpperCase();
 }
 
-/**
- * Member token: an opaque random id issued when an application is approved.
- * Acts as both a site-access pass and the identity used to mint invite codes.
- */
-export function generateMemberToken(): string {
-  const bytes = randBytes(24);
-  return (
-    "m_" +
-    Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
-  );
-}
 
 // --- gate pass (signed HMAC, so we don't need a DB lookup on every request) ---
 

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "群规则 | LX 矩阵 · 蓝V互推",
-  description: "LX 矩阵蓝V互推群的入群要求、互推玩法与日常约定。",
+  title: "群规则 | LX 矩阵",
+  description: "LX 矩阵的入群要求、玩法与日常约定。",
 };
 
 type Section = {

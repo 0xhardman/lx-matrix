@@ -50,14 +50,19 @@ let initialized = false;
 /**
  * Application review status.
  */
-export type ApplicationStatus = "pending" | "approved" | "rejected";
+export type ApplicationStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "deactivated";
 
 /**
  * A membership application row as returned to the admin dashboard.
  */
 export interface Application {
   id: number;
-  twitter: string;
+  twitter: string; // @handle (display only — may change over time)
+  twitter_id: string | null; // stable Twitter user id (identity key)
   wechat: string;
   has_blue_v: boolean | null;
   is_lxdao_member: boolean | null;
@@ -67,7 +72,6 @@ export interface Application {
   intro: string | null;
   referrer: string | null;
   status: ApplicationStatus;
-  member_token: string | null;
   invite_code_used: string | null;
   // Cached public Twitter profile, refreshed by the snapshot cron.
   display_name: string | null;
@@ -98,7 +102,7 @@ export interface TweetSnapshot {
  */
 export interface InviteCode {
   code: string;
-  created_by: string | null; // member token or 'admin'
+  created_by: string | null; // creator's twitter_id, or 'admin'
   created_by_twitter: string | null;
   expires_at: string;
   used_at: string | null;
@@ -136,11 +140,16 @@ export async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS status           TEXT NOT NULL DEFAULT 'pending',
       ADD COLUMN IF NOT EXISTS member_token     TEXT,
       ADD COLUMN IF NOT EXISTS invite_code_used TEXT,
+      ADD COLUMN IF NOT EXISTS twitter_id       TEXT,
       -- Cached public Twitter profile, refreshed by the snapshot cron.
       ADD COLUMN IF NOT EXISTS display_name      TEXT,
       ADD COLUMN IF NOT EXISTS avatar_url        TEXT,
       ADD COLUMN IF NOT EXISTS last_tweets_count INTEGER,
       ADD COLUMN IF NOT EXISTS last_snapshot_at  TIMESTAMPTZ;
+
+    -- Stable Twitter user id is the identity key (handle can change).
+    CREATE UNIQUE INDEX IF NOT EXISTS twitter_registrations_twitter_id_key
+      ON twitter_registrations (twitter_id) WHERE twitter_id IS NOT NULL;
 
     -- Per-run capture of each member's public Twitter counters. The daily
     -- posting volume is computed as the delta between consecutive snapshots.

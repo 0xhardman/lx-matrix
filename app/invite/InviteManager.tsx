@@ -11,70 +11,46 @@ interface Code {
 }
 
 export function InviteManager() {
-  const [token, setToken] = useState("");
-  const [authed, setAuthed] = useState(false);
+  const [authed, setAuthed] = useState<boolean | null>(null); // null = loading
   const [memberTwitter, setMemberTwitter] = useState("");
   const [codes, setCodes] = useState<Code[]>([]);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState("");
 
-  // Try the cookie first (returning member); or bootstrap from a pasted token
-  // via PUT (token goes in the body, never the URL).
-  const tryLoad = useCallback(async (withToken?: string) => {
-    setLoading(true);
+  const load = useCallback(async () => {
     setError("");
     try {
-      const res = withToken
-        ? await fetch("/api/invite", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: withToken }),
-          })
-        : await fetch("/api/invite");
+      const res = await fetch("/api/invite");
       if (!res.ok) {
-        if (!withToken) {
-          // No valid cookie — show the token entry, no error.
-          setAuthed(false);
-          return false;
-        }
-        const data = await res.json();
-        setError(data.error ?? "凭证无效");
-        return false;
+        setAuthed(false);
+        return;
       }
       const data = await res.json();
       setAuthed(true);
       setMemberTwitter(data.member?.twitter ?? "");
       setCodes(data.codes ?? []);
-      return true;
     } catch {
+      setAuthed(false);
       setError("网络错误");
-      return false;
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    tryLoad();
-  }, [tryLoad]);
+    load();
+  }, [load]);
 
   async function generate() {
     setGenerating(true);
     setError("");
     try {
-      const res = await fetch("/api/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: token || undefined }),
-      });
+      const res = await fetch("/api/invite", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "生成失败");
         return;
       }
-      await tryLoad(token || undefined);
+      await load();
     } catch {
       setError("网络错误");
     } finally {
@@ -89,42 +65,29 @@ export function InviteManager() {
   }
 
   function statusOf(c: Code): { label: string; cls: string } {
-    if (c.used_at)
-      return { label: "已使用", cls: "bg-gray-100 text-gray-500" };
+    if (c.used_at) return { label: "已使用", cls: "bg-gray-100 text-gray-500" };
     if (new Date(c.expires_at).getTime() < Date.now())
       return { label: "已过期", cls: "bg-red-100 text-red-600" };
     return { label: "可用", cls: "bg-green-100 text-green-700" };
   }
 
+  if (authed === null) {
+    return <p className="mt-10 text-center text-muted">加载中…</p>;
+  }
+
+  // Not a logged-in member — prompt to log in with Twitter.
   if (!authed) {
     return (
-      <div className="mt-8 rounded-xl border border-divider bg-background p-6 shadow-[0_4px_24px_var(--card-shadow)]">
-        <label htmlFor="token" className="block text-sm font-semibold">
-          成员凭证
-        </label>
-        <p className="mt-1 text-xs text-muted">
-          审核通过后你会收到一个成员凭证（以 m_ 开头），粘贴到这里。
+      <div className="mt-8 rounded-xl border border-divider bg-background p-8 text-center shadow-[0_4px_24px_var(--card-shadow)]">
+        <p className="leading-relaxed text-muted">
+          只有通过审核的成员才能生成邀请码。请用你的 Twitter 账号登录。
         </p>
-        <input
-          id="token"
-          type="text"
-          value={token}
-          onChange={(e) => setToken(e.target.value.trim())}
-          placeholder="m_xxxxxxxx…"
-          className="mt-2 w-full rounded-[5px] border border-divider bg-background px-4 py-3 text-base outline-none transition-colors focus:border-foreground"
-        />
-        {error && (
-          <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </p>
-        )}
-        <button
-          onClick={() => tryLoad(token)}
-          disabled={loading || !token}
-          className="mt-5 w-full rounded-md bg-primary px-6 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85 disabled:opacity-50"
+        <a
+          href="/api/auth/twitter"
+          className="mt-6 inline-flex items-center justify-center gap-2 rounded-md bg-black px-6 py-3 text-base font-semibold text-white transition-opacity hover:opacity-85"
         >
-          {loading ? "验证中…" : "进入"}
-        </button>
+          <span className="text-lg">𝕏</span> 用 Twitter 登录
+        </a>
       </div>
     );
   }
@@ -133,8 +96,7 @@ export function InviteManager() {
     <div className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-divider bg-alternate px-5 py-4">
         <p className="text-sm">
-          成员：
-          <span className="font-semibold">{memberTwitter}</span>
+          成员：<span className="font-semibold">{memberTwitter}</span>
         </p>
         <button
           onClick={generate}

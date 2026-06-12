@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LX 矩阵 · 蓝V互推",
+  title: "LX 矩阵",
   description:
-    "LXDAO 蓝V 互推矩阵 —— Web3 / AI / 技术 / 投研 方向的小而精互推社群。",
+    "LXDAO 社群矩阵 —— Web3 / AI / 技术 / 投研 方向的小而精社群。",
 };
 
 export default function RootLayout({

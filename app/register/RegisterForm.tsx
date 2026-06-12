@@ -16,8 +16,7 @@ const inputClass =
 const labelClass = "block text-sm font-semibold text-foreground";
 const hintClass = "mt-1.5 text-xs text-muted";
 
-export function RegisterForm() {
-  const [twitter, setTwitter] = useState("");
+export function RegisterForm({ twitter }: { twitter: string }) {
   const [wechat, setWechat] = useState("");
   const [hasBlueV, setHasBlueV] = useState<boolean | null>(null);
   const [isLxdaoMember, setIsLxdaoMember] = useState<boolean | null>(null);
@@ -35,7 +34,6 @@ export function RegisterForm() {
   }
 
   function reset() {
-    setTwitter("");
     setWechat("");
     setHasBlueV(null);
     setIsLxdaoMember(null);
@@ -55,7 +53,6 @@ export function RegisterForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          twitter,
           wechat,
           hasBlueV,
           isLxdaoMember,
@@ -110,21 +107,16 @@ export function RegisterForm() {
       className="rounded-xl border border-divider bg-background p-6 shadow-[0_4px_24px_var(--card-shadow)] sm:p-8"
     >
       <div className="space-y-7">
-        {/* Twitter */}
+        {/* Twitter — verified from login, not editable */}
         <div>
-          <label htmlFor="twitter" className={labelClass}>
-            Twitter 账号 <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="twitter"
-            type="text"
-            required
-            value={twitter}
-            onChange={(e) => setTwitter(e.target.value)}
-            placeholder="@yourhandle 或 https://x.com/yourhandle"
-            className={inputClass}
-          />
-          <p className={hintClass}>填 @用户名 或直接粘贴主页链接都可以。</p>
+          <span className={labelClass}>Twitter 账号</span>
+          <div className="mt-2 flex items-center gap-2 rounded-[5px] border border-divider bg-alternate px-4 py-3">
+            <span className="text-base font-semibold">{twitter}</span>
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              已登录验证
+            </span>
+          </div>
+          <p className={hintClass}>来自你的 Twitter 登录，无需手填。</p>
         </div>
 
         {/* WeChat */}

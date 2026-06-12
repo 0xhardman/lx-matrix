@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { MEMBER_COOKIE } from "@/app/lib/gate";
+import { SESSION_COOKIE, readSession } from "@/app/lib/session";
 
 const highlights = [
   {
@@ -19,7 +19,8 @@ const highlights = [
 
 export default async function Home() {
   const store = await cookies();
-  const isMember = Boolean(store.get(MEMBER_COOKIE)?.value);
+  const session = await readSession(store.get(SESSION_COOKIE)?.value);
+  const isMember = Boolean(session?.isMember);
   return (
     <div>
       {/* Hero */}

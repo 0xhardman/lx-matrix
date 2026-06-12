@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { MEMBER_COOKIE } from "@/app/lib/gate";
+import { SESSION_COOKIE, readSession } from "@/app/lib/session";
 
 export async function SiteFooter() {
   const store = await cookies();
-  const isMember = Boolean(store.get(MEMBER_COOKIE)?.value);
+  const session = await readSession(store.get(SESSION_COOKIE)?.value);
+  const isMember = Boolean(session?.isMember);
   return (
     <footer className="border-t border-divider bg-alternate">
       <div className="mx-auto flex max-w-[1216px] flex-col items-center justify-between gap-4 px-5 py-8 text-sm text-muted sm:flex-row">
         <p>
-          LX 矩阵 · 蓝V互推 <span className="text-secondary-dark">💗</span> Built
-          by{" "}
+          LX 矩阵 <span className="text-secondary-dark">💗</span> Built by{" "}
           <Link
             href="https://lxdao.io"
             target="_blank"
