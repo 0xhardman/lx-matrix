@@ -141,6 +141,7 @@ export async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS member_token     TEXT,
       ADD COLUMN IF NOT EXISTS invite_code_used TEXT,
       ADD COLUMN IF NOT EXISTS twitter_id       TEXT,
+      ADD COLUMN IF NOT EXISTS ext_token        TEXT,
       -- Cached public Twitter profile, refreshed by the snapshot cron.
       ADD COLUMN IF NOT EXISTS display_name      TEXT,
       ADD COLUMN IF NOT EXISTS avatar_url        TEXT,

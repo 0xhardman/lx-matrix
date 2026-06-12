@@ -41,6 +41,21 @@ export function normalizeCode(raw: string): string {
   return raw.trim().toUpperCase();
 }
 
+/**
+ * Extension token: a read-only bearer credential a member generates for the
+ * browser extension (which can't carry the OAuth session cookie). Scoped to
+ * reading the member directory only — it cannot mint invite codes.
+ */
+export function generateExtToken(): string {
+  const bytes = randBytes(24);
+  return (
+    "ext_" +
+    Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
 
 // --- gate pass (signed HMAC, so we don't need a DB lookup on every request) ---
 

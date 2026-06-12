@@ -194,16 +194,16 @@ function SettingsPanel({
         />
       </label>
       <label className="field">
-        <span>成员令牌</span>
+        <span>扩展令牌</span>
         <input
           type="password"
-          placeholder="m_..."
+          placeholder="ext_..."
           value={token}
           onChange={(e) => setToken(e.target.value)}
         />
       </label>
       <p className="note">
-        令牌即审核通过后获得的 member token，可在 /invite 页面找到。仅已通过审核的成员可查看。
+        扩展令牌在网站的 /extension 页面登录后生成（ext_ 开头）。仅已通过审核的成员可查看。
       </p>
       <div className="settings-actions">
         <button

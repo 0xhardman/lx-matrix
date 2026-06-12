@@ -34,11 +34,16 @@ export async function SiteHeader() {
             群规则
           </Link>
 
-          {/* Members get the invite manager; non-members the apply link. */}
+          {/* Members get the invite manager + plugin; non-members the apply link. */}
           {isMember ? (
-            <Link href="/invite" className={linkClass}>
-              我的邀请码
-            </Link>
+            <>
+              <Link href="/invite" className={linkClass}>
+                我的邀请码
+              </Link>
+              <Link href="/extension" className={linkClass}>
+                插件
+              </Link>
+            </>
           ) : (
             <Link href="/register" className={linkClass}>
               申请加入

@@ -22,27 +22,38 @@ interface MemberRow {
   baseline_count: number | null;
 }
 
-export async function GET() {
-  // Only approved members (by OAuth session, re-checked against the DB) may
-  // read the member directory.
-  const store = await cookies();
-  const session = await readSession(store.get(SESSION_COOKIE)?.value);
-  if (!session?.twitterId) {
-    return NextResponse.json({ error: "请先登录" }, { status: 401 });
-  }
-
+export async function GET(request: Request) {
+  // Two ways in, both must resolve to an approved member:
+  //  - the web app sends the OAuth session cookie
+  //  - the browser extension sends its ext token in `x-member-token`
+  //    (it can't carry the httpOnly, SameSite=lax session cookie cross-origin)
   try {
     await ensureSchema();
     const pool = getPool();
 
-    const auth = await pool.query(
-      `SELECT 1 FROM twitter_registrations
-        WHERE twitter_id = $1 AND status = 'approved'
-        LIMIT 1`,
-      [session.twitterId]
-    );
-    if (auth.rowCount === 0) {
-      return NextResponse.json({ error: "不是成员" }, { status: 401 });
+    const extToken = request.headers.get("x-member-token")?.trim();
+    let authed = false;
+    if (extToken && extToken.startsWith("ext_")) {
+      const r = await pool.query(
+        `SELECT 1 FROM twitter_registrations
+          WHERE ext_token = $1 AND status = 'approved' LIMIT 1`,
+        [extToken]
+      );
+      authed = r.rowCount! > 0;
+    } else {
+      const store = await cookies();
+      const session = await readSession(store.get(SESSION_COOKIE)?.value);
+      if (session?.twitterId) {
+        const r = await pool.query(
+          `SELECT 1 FROM twitter_registrations
+            WHERE twitter_id = $1 AND status = 'approved' LIMIT 1`,
+          [session.twitterId]
+        );
+        authed = r.rowCount! > 0;
+      }
+    }
+    if (!authed) {
+      return NextResponse.json({ error: "未授权" }, { status: 401 });
     }
 
     // For each approved member, pull the cached current counter plus the
