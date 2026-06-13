@@ -33,3 +33,26 @@ export async function fetchFeed(
 export async function fetchMembers(settings: Settings): Promise<MembersResponse> {
   return get<MembersResponse>(settings, "/api/members");
 }
+
+/** Check in (or withdraw a check-in) on a member tweet. */
+export async function setEngaged(
+  settings: Settings,
+  tweetId: string,
+  engaged: boolean
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${base(settings)}/api/engagements`, {
+      method: "POST",
+      headers: {
+        "x-member-token": settings.token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ tweetId, engaged, source: "popup" }),
+    });
+  } catch {
+    throw new Error("无法连接服务，请检查服务地址");
+  }
+  if (res.status === 401) throw new Error("令牌无效或未授权");
+  if (!res.ok) throw new Error(`打卡失败 (${res.status})`);
+}

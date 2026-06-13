@@ -7,6 +7,8 @@ export function ExtTokenManager() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Whether the installed extension acknowledged receiving the token.
+  const [connected, setConnected] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -26,6 +28,37 @@ export function ExtTokenManager() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Listen for the extension's content script acknowledging the handoff.
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      if (
+        e.source === window &&
+        e.origin === window.location.origin &&
+        e.data?.source === "lx-matrix-ext" &&
+        e.data?.type === "connected"
+      ) {
+        setConnected(true);
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  // Hand the token to the extension (if installed) — its content script saves
+  // it so the popup needs no manual entry. Posted whenever the token changes.
+  useEffect(() => {
+    if (!token) return;
+    window.postMessage(
+      {
+        source: "lx-matrix",
+        type: "ext-token",
+        token,
+        apiBase: window.location.origin,
+      },
+      window.location.origin
+    );
+  }, [token]);
 
   async function generate() {
     setBusy(true);
@@ -67,6 +100,11 @@ export function ExtTokenManager() {
 
   return (
     <div className="rounded-lg border border-divider bg-background p-5">
+      {connected && (
+        <div className="mb-4 rounded-md border border-green-600/30 bg-green-600/10 px-4 py-3 text-sm font-medium text-green-700">
+          ✓ 已自动填入浏览器插件，点开插件图标即可直接使用，无需复制。
+        </div>
+      )}
       {token ? (
         <>
           <div className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchFeed, fetchMembers } from "./api";
+import { fetchFeed, fetchMembers, setEngaged } from "./api";
 import { loadSettings, saveSettings } from "./storage";
-import type { FeedItem, Member, Settings } from "./types";
+import type { FeedItem, FeedSummary, Member, Settings } from "./types";
 
 type Tab = "feed" | "members";
 type Status = "loading" | "ready" | "error" | "needs-setup";
@@ -13,6 +13,7 @@ export function App() {
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [feedAt, setFeedAt] = useState<string | null>(null);
+  const [summary, setSummary] = useState<FeedSummary | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
 
@@ -26,6 +27,7 @@ export function App() {
       const data = await fetchFeed(s, force);
       setFeed(data.items);
       setFeedAt(data.refreshedAt);
+      setSummary(data.summary ?? null);
       setStatus("ready");
     } catch (e) {
       setError(e instanceof Error ? e.message : "未知错误");
@@ -73,6 +75,42 @@ export function App() {
   }
 
   const sortedMembers = useMemo(() => sortMembers(members), [members]);
+  const sortedFeed = useMemo(() => sortFeed(feed), [feed]);
+
+  // Optimistic toggle; revert on failure. The badge is recomputed by the
+  // service worker so it stays consistent with what the server accepted.
+  const toggleEngaged = useCallback(
+    async (item: FeedItem) => {
+      if (!settings || item.own) return;
+      const next = !item.engaged;
+      const apply = (items: FeedItem[], engaged: boolean) =>
+        items.map((t) =>
+          t.tweet_id === item.tweet_id ? { ...t, engaged } : t
+        );
+      setFeed((f) => apply(f, next));
+      setSummary((s) =>
+        s
+          ? {
+              pending: Math.max(
+                0,
+                s.pending + (isPending24h(item) ? (next ? -1 : 1) : 0)
+              ),
+              engagedToday: Math.max(0, s.engagedToday + (next ? 1 : -1)),
+            }
+          : s
+      );
+      try {
+        await setEngaged(settings, item.tweet_id, next);
+        chrome.runtime
+          .sendMessage({ type: "lx:refreshBadge" })
+          .catch(() => undefined);
+      } catch {
+        setFeed((f) => apply(f, !next));
+        if (settings) void loadFeed(settings);
+      }
+    },
+    [settings, loadFeed]
+  );
 
   if (!settings) return <div className="app loading">加载中…</div>;
 
@@ -143,12 +181,23 @@ export function App() {
 
           {status === "ready" && tab === "feed" && (
             <>
-              {feed.length === 0 ? (
+              {summary && (
+                <div className="summary">
+                  {summary.pending > 0 ? (
+                    <span className="warn">待互动 {summary.pending}</span>
+                  ) : (
+                    <span className="ok">今日矩阵任务已清空 ✓</span>
+                  )}
+                  <span className="muted">·</span>
+                  <span className="muted">今日已互动 {summary.engagedToday}</span>
+                </div>
+              )}
+              {sortedFeed.length === 0 ? (
                 <div className="hint">暂时没有动态，过会儿再看看。</div>
               ) : (
                 <ul className="list">
-                  {feed.map((t) => (
-                    <FeedCard key={t.tweet_id} t={t} />
+                  {sortedFeed.map((t) => (
+                    <FeedCard key={t.tweet_id} t={t} onToggle={toggleEngaged} />
                   ))}
                 </ul>
               )}
@@ -176,10 +225,16 @@ export function App() {
   );
 }
 
-function FeedCard({ t }: { t: FeedItem }) {
+function FeedCard({
+  t,
+  onToggle,
+}: {
+  t: FeedItem;
+  onToggle: (item: FeedItem) => void;
+}) {
   const handle = t.twitter.replace(/^@/, "");
   return (
-    <li className="tweet">
+    <li className={t.engaged || t.own ? "tweet done" : "tweet"}>
       <a
         className="avatar-link"
         href={`https://x.com/${handle}`}
@@ -198,6 +253,7 @@ function FeedCard({ t }: { t: FeedItem }) {
           <span className="sub dim">@{handle}</span>
           {t.tweet_at && <span className="dim"> · {timeAgo(t.tweet_at)}</span>}
           {t.is_quote && <span className="freq">引用</span>}
+          {t.own && <span className="freq own-tag">我的</span>}
         </div>
         {t.text && <div className="tweet-text">{t.text}</div>}
         <div className="tweet-foot">
@@ -205,13 +261,47 @@ function FeedCard({ t }: { t: FeedItem }) {
             ♥ {fmt(t.like_count)} · 💬 {fmt(t.reply_count)} · 🔁{" "}
             {fmt(t.retweet_count)}
           </span>
-          <a className="go-btn" href={t.url} target="_blank" rel="noreferrer">
-            去互动 ↗
-          </a>
+          <span className="tweet-actions">
+            {!t.own &&
+              (t.engaged ? (
+                <button
+                  className="mark-btn done"
+                  title="点击撤销打卡"
+                  onClick={() => onToggle(t)}
+                >
+                  已互动 ✓
+                </button>
+              ) : (
+                <button
+                  className="mark-btn"
+                  title="互动完成后打卡"
+                  onClick={() => onToggle(t)}
+                >
+                  打卡
+                </button>
+              ))}
+            <a className="go-btn" href={t.url} target="_blank" rel="noreferrer">
+              去互动 ↗
+            </a>
+          </span>
         </div>
       </div>
     </li>
   );
+}
+
+/** Is this tweet part of the badge's pending count (last 24h, not mine)? */
+function isPending24h(t: FeedItem): boolean {
+  if (t.own || !t.tweet_at) return false;
+  return Date.now() - new Date(t.tweet_at).getTime() < 24 * 3600_000;
+}
+
+// Pending engagements first (newest first), then done/own (newest first).
+function sortFeed(items: FeedItem[]): FeedItem[] {
+  const time = (t: FeedItem) =>
+    t.tweet_at ? new Date(t.tweet_at).getTime() : 0;
+  const rank = (t: FeedItem) => (t.engaged || t.own ? 1 : 0);
+  return [...items].sort((a, b) => rank(a) - rank(b) || time(b) - time(a));
 }
 
 function MemberRow({ m }: { m: Member }) {
@@ -282,7 +372,8 @@ function SettingsPanel({
         />
       </label>
       <p className="note">
-        扩展令牌在网站的 /extension 页面登录后生成（ext_ 开头）。仅已通过审核的成员可查看。
+        正常情况下，登录网站的 /extension 页面并生成令牌后，这里会自动填好，无需手动复制。
+        若没自动填上，可把页面上 ext_ 开头的令牌粘到这里。仅已通过审核的成员可用。
       </p>
       <div className="settings-actions">
         <button

@@ -189,6 +189,20 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS member_tweets_tweet_at_idx
       ON member_tweets (tweet_at DESC);
 
+    -- Engagement check-ins: which member has interacted with which member
+    -- tweet. Written by POST /api/engagements (popup button or the x.com
+    -- content script's auto report); read by /api/feed to mark items done.
+    CREATE TABLE IF NOT EXISTS tweet_engagements (
+      registration_id BIGINT NOT NULL
+        REFERENCES twitter_registrations (id) ON DELETE CASCADE,
+      tweet_id        TEXT NOT NULL,
+      source          TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (registration_id, tweet_id)
+    );
+    CREATE INDEX IF NOT EXISTS tweet_engagements_tweet_idx
+      ON tweet_engagements (tweet_id);
+
     -- Invite codes: single-use, time-limited.
     CREATE TABLE IF NOT EXISTS invite_codes (
       code               TEXT PRIMARY KEY,

@@ -50,7 +50,11 @@ npm run dev
 - 托管数据库可设 `DATABASE_CA_CERT`（PEM）做正规校验；
 - 实在不行可设 `DATABASE_SSL_NO_VERIFY=true` 跳过校验（仅限开发，不推荐）。
 
+## 浏览器插件（流量矩阵助手）
+
+`extension/` 是配套 Chrome 插件，闭环成员互推：待互动队列 + 角标提醒 + x.com 上识别成员推文并自动打卡。产品设计与分期见 [`docs/extension-roadmap.md`](docs/extension-roadmap.md)，开发说明见 [`extension/README.md`](extension/README.md)。
+
 ## 后续规划
 
-- 浏览器插件：识别群成员发的推文、在 Twitter 上标记群成员身份
+- 互动率排行与管理端覆盖率看板（路线图 Phase 3）
 - 推特群组联动

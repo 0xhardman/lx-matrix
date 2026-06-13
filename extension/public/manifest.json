@@ -1,12 +1,39 @@
 {
   "manifest_version": 3,
-  "name": "LX 矩阵 · 成员监控",
-  "version": "0.1.0",
-  "description": "查看 LX 矩阵已通过审核的成员，以及他们今天有没有发帖。",
+  "name": "LX 矩阵 · 流量矩阵助手",
+  "version": "0.2.0",
+  "description": "成员动态打卡闭环：待互动角标提醒，x.com 上识别矩阵成员并自动记录互动。",
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
   "action": {
     "default_popup": "index.html",
-    "default_title": "LX 矩阵成员监控"
+    "default_title": "LX 矩阵",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
   },
-  "permissions": ["storage"],
-  "host_permissions": ["http://localhost/*", "https://*/*"]
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://lx-matrix.vercel.app/*", "http://localhost/*"],
+      "js": ["connect.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["https://lx-matrix.vercel.app/*", "http://localhost/*"]
 }

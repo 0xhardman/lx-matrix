@@ -3,7 +3,10 @@ import type { Settings } from "./types";
 const KEY = "lx_settings";
 
 const DEFAULTS: Settings = {
-  apiBase: "",
+  // Pre-filled so members don't have to type it. Auto-connect (the /extension
+  // page → connect content script) overrides this with the real origin, which
+  // matters for local dev (http://localhost:3000).
+  apiBase: "https://lx-matrix.vercel.app",
   token: "",
 };
 

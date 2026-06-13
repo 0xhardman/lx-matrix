@@ -24,6 +24,9 @@ export async function SiteFooter() {
           <Link href="/rules" className="hover:text-foreground">
             群规则
           </Link>
+          <Link href="/privacy" className="hover:text-foreground">
+            隐私政策
+          </Link>
           {isMember ? (
             <Link href="/invite" className="hover:text-foreground">
               我的邀请码

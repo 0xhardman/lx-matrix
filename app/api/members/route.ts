@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { ensureSchema, getPool } from "@/app/lib/db";
-import { SESSION_COOKIE, readSession } from "@/app/lib/session";
+import { resolveMember } from "@/app/lib/memberAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,36 +22,11 @@ interface MemberRow {
 }
 
 export async function GET(request: Request) {
-  // Two ways in, both must resolve to an approved member:
-  //  - the web app sends the OAuth session cookie
-  //  - the browser extension sends its ext token in `x-member-token`
-  //    (it can't carry the httpOnly, SameSite=lax session cookie cross-origin)
   try {
     await ensureSchema();
     const pool = getPool();
 
-    const extToken = request.headers.get("x-member-token")?.trim();
-    let authed = false;
-    if (extToken && extToken.startsWith("ext_")) {
-      const r = await pool.query(
-        `SELECT 1 FROM twitter_registrations
-          WHERE ext_token = $1 AND status = 'approved' LIMIT 1`,
-        [extToken]
-      );
-      authed = r.rowCount! > 0;
-    } else {
-      const store = await cookies();
-      const session = await readSession(store.get(SESSION_COOKIE)?.value);
-      if (session?.twitterId) {
-        const r = await pool.query(
-          `SELECT 1 FROM twitter_registrations
-            WHERE twitter_id = $1 AND status = 'approved' LIMIT 1`,
-          [session.twitterId]
-        );
-        authed = r.rowCount! > 0;
-      }
-    }
-    if (!authed) {
+    if (!(await resolveMember(request))) {
       return NextResponse.json({ error: "未授权" }, { status: 401 });
     }
 

@@ -31,8 +31,8 @@ export default function ExtensionPage() {
             浏览器插件
           </h1>
           <p className="mx-auto mt-4 max-w-md leading-relaxed text-muted">
-            一个 Chrome 插件：一眼看到已通过审核的成员，以及他们今天有没有发帖，
-            方便互相提醒、组织互动。
+            流量矩阵助手：成员新帖自动进入你的待互动队列，浏览器角标提醒；
+            在 X 上刷到成员推文会打「LX 矩阵」标，点赞/转发/回复自动打卡。
           </p>
         </div>
       </section>
@@ -79,28 +79,19 @@ export default function ExtensionPage() {
 
         {/* Step 3: configure */}
         <section>
-          <h2 className="text-xl font-bold">③ 配置插件</h2>
+          <h2 className="text-xl font-bold">③ 连接插件</h2>
           <p className="mt-2 leading-relaxed text-muted">
-            首次打开插件面板，点设置（⚙），填两项：
+            装好插件后，点下面的「生成扩展令牌」，插件会
+            <span className="font-semibold text-foreground">自动填好</span>
+            服务地址和令牌——点开工具栏图标就能直接用，不用复制粘贴。
           </p>
-          <ul className="mt-3 space-y-2 text-muted">
-            <li className="flex gap-2">
-              <span className="font-semibold text-foreground">服务地址：</span>
-              <code className="rounded bg-alternate px-1.5 py-0.5 text-sm">
-                https://lx-matrix.vercel.app
-              </code>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-semibold text-foreground">扩展令牌：</span>
-              <span>用下面生成的 ext_ 令牌。</span>
-            </li>
-          </ul>
 
           <div className="mt-5">
             <p className="mb-2 text-sm font-semibold">你的扩展令牌</p>
             <ExtTokenManager />
             <p className="mt-2 text-xs text-muted">
-              令牌只读成员列表，不能生成邀请码。请勿分享给他人；怀疑泄露就「重新生成」。
+              令牌只能读成员动态、以你的身份打互动卡，不能生成邀请码。请勿分享给他人；怀疑泄露就「重新生成」。
+              没装插件时，可手动复制令牌、在插件设置里粘贴。
             </p>
           </div>
         </section>

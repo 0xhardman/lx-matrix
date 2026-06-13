@@ -34,9 +34,17 @@ export interface FeedItem {
   views_count: number | null;
   is_quote: boolean | null;
   url: string;
+  engaged: boolean; // I already checked in on this tweet
+  own: boolean; // my own tweet — not part of my queue
+}
+
+export interface FeedSummary {
+  pending: number; // last-24h member tweets I haven't engaged with
+  engagedToday: number; // my check-ins since the start of today (Beijing)
 }
 
 export interface FeedResponse {
   items: FeedItem[];
   refreshedAt: string | null;
+  summary: FeedSummary;
 }

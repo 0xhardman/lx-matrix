@@ -1,0 +1,6 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="28" fill="#f9b934"/>
+  <text x="64" y="64" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-size="62" font-weight="800" fill="#111418"
+        text-anchor="middle" dominant-baseline="central" letter-spacing="-2">LX</text>
+</svg>

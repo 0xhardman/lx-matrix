@@ -1,13 +1,14 @@
 {
   "name": "lx-matrix-extension",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "LX 矩阵成员监控 Chrome 插件",
+  "description": "LX 矩阵流量矩阵助手 Chrome 插件",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "pack:store": "npm run build && node scripts/pack-store.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",
