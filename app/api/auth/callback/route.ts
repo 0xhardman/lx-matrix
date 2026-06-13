@@ -25,7 +25,12 @@ function baseUrl(request: Request): string {
 function fail(request: Request, reason: string) {
   const url = new URL("/login", baseUrl(request));
   url.searchParams.set("error", reason);
-  return NextResponse.redirect(url);
+  const res = NextResponse.redirect(url);
+  // Drop the one-time OAuth cookies so a failed attempt can't leave a stale
+  // `state` behind and trip state_mismatch on the next try.
+  res.cookies.delete(OAUTH_STATE_COOKIE);
+  res.cookies.delete(OAUTH_VERIFIER_COOKIE);
+  return res;
 }
 
 export async function GET(request: Request) {
